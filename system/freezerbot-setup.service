@@ -1,0 +1,12 @@
+[Unit]
+Description=Freezerbot Setup Service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/pi/freezerbot/freezerbot_setup.py
+WorkingDirectory=/home/pi/freezerbot
+Restart=on-failure
+User=root
+
+[Install]
+WantedBy=multi-user.target

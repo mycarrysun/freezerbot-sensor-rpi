@@ -1,0 +1,12 @@
+[Unit]
+Description=Freezerbot Temperature Monitor
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/pi/freezerbot/temperature_monitor.py
+WorkingDirectory=/home/pi/freezerbot
+Restart=on-failure
+User=pi
+
+[Install]
+WantedBy=multi-user.target
