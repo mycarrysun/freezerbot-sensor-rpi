@@ -1,7 +1,7 @@
 <template>
   <div class="container">
     <div class="logo">
-      <img src="/logo.png" alt="Freezerbot Logo">
+      <img src="/logo.svg" alt="Freezerbot Logo">
     </div>
     <h1>Freezerbot Setup</h1>
 
@@ -18,36 +18,23 @@
   </div>
 </template>
 
-<script>
+<script lang="ts" setup>
 import { ref } from 'vue';
 import SetupForm from './components/SetupForm.vue';
 
-export default {
-  components: {
-    SetupForm
-  },
-  setup() {
-    const setupComplete = ref(false);
-    const countdown = ref(10);
+const setupComplete = ref(false);
+const countdown = ref(10);
 
-    function onSetupCompleted() {
-      setupComplete.value = true;
+function onSetupCompleted() {
+  setupComplete.value = true;
 
-      const timer = setInterval(() => {
-        countdown.value--;
+  const timer = setInterval(() => {
+    countdown.value--;
 
-        if (countdown.value <= 0) {
-          clearInterval(timer);
-        }
-      }, 1000);
+    if (countdown.value <= 0) {
+      clearInterval(timer);
     }
-
-    return {
-      setupComplete,
-      countdown,
-      onSetupCompleted
-    };
-  }
+  }, 1000);
 }
 </script>
 

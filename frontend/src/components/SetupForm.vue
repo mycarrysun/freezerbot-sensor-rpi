@@ -46,96 +46,99 @@
   </form>
 </template>
 
-<script>
+<script setup lang="ts">
 import { ref, reactive } from 'vue';
 
-export default {
-  emits: ['setup-completed'],
-  setup(props, { emit }) {
-    const formData = reactive({
-      wifi_ssid: '',
-      wifi_password: '',
-      api_token: '',
-      freezer_name: ''
+// Define types
+interface FormData {
+  wifi_ssid: string;
+  wifi_password: string;
+  api_token: string;
+  freezer_name: string;
+}
+
+interface ApiResponse {
+  success: boolean;
+  error?: string;
+  networks?: string[];
+}
+
+// Define props and emits
+const emit = defineEmits<{
+  (e: 'setup-completed'): void;
+}>();
+
+// Reactive state
+const formData = reactive<FormData>({
+  wifi_ssid: '',
+  wifi_password: '',
+  api_token: '',
+  freezer_name: ''
+});
+
+const networks = ref<string[]>([]);
+const showNetworkList = ref<boolean>(false);
+const isScanning = ref<boolean>(false);
+const isSubmitting = ref<boolean>(false);
+const error = ref<string>('');
+const formError = ref<string>('');
+
+// Methods
+async function scanWifi() {
+  showNetworkList.value = true;
+  isScanning.value = true;
+  error.value = '';
+
+  try {
+    const response = await fetch('/api/scan-wifi');
+    const data = await response.json() as ApiResponse;
+
+    if (data.error) {
+      error.value = data.error;
+    } else {
+      networks.value = data.networks || [];
+      if (networks.value.length === 0) {
+        error.value = 'No networks found. Please check that WiFi is enabled on your device.';
+      }
+    }
+  } catch (err) {
+    error.value = 'Failed to scan networks. Please try again or enter network name manually.';
+    console.error('Error scanning WiFi:', err);
+  } finally {
+    isScanning.value = false;
+  }
+}
+
+function selectNetwork(network: string) {
+  formData.wifi_ssid = network;
+  showNetworkList.value = false;
+}
+
+async function submitForm() {
+  isSubmitting.value = true;
+  formError.value = '';
+
+  try {
+    const response = await fetch('/api/setup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(formData)
     });
 
-    const networks = ref([]);
-    const showNetworkList = ref(false);
-    const isScanning = ref(false);
-    const isSubmitting = ref(false);
-    const error = ref('');
-    const formError = ref('');
+    const result = await response.json() as ApiResponse;
 
-    async function scanWifi() {
-      showNetworkList.value = true;
-      isScanning.value = true;
-      error.value = '';
-
-      try {
-        const response = await fetch('/api/scan-wifi');
-        const data = await response.json();
-
-        if (data.error) {
-          error.value = data.error;
-        } else {
-          networks.value = data.networks || [];
-          if (networks.value.length === 0) {
-            error.value = 'No networks found. Please check that WiFi is enabled on your device.';
-          }
-        }
-      } catch (err) {
-        error.value = 'Failed to scan networks. Please try again or enter network name manually.';
-        console.error('Error scanning WiFi:', err);
-      } finally {
-        isScanning.value = false;
-      }
+    if (result.success) {
+      emit('setup-completed');
+    } else {
+      formError.value = result.error || 'Setup failed. Please try again.';
     }
-
-    function selectNetwork(network) {
-      formData.wifi_ssid = network;
-      showNetworkList.value = false;
-    }
-
-    async function submitForm() {
-      isSubmitting.value = true;
-      formError.value = '';
-
-      try {
-        const response = await fetch('/api/setup', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(formData)
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-          emit('setup-completed');
-        } else {
-          formError.value = result.error || 'Setup failed. Please try again.';
-        }
-      } catch (err) {
-        formError.value = 'Connection error. Please try again.';
-        console.error('Error submitting form:', err);
-      } finally {
-        isSubmitting.value = false;
-      }
-    }
-
-    return {
-      formData,
-      networks,
-      showNetworkList,
-      isScanning,
-      isSubmitting,
-      error,
-      formError,
-      scanWifi,
-      selectNetwork,
-      submitForm
-    };
+  } catch (err) {
+    formError.value = 'Connection error. Please try again.';
+    console.error('Error submitting form:', err);
+  } finally {
+    isSubmitting.value = false;
   }
 }
 </script>

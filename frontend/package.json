@@ -1,0 +1,22 @@
+{
+  "name": "freezerbot-sensor-wizard",
+  "version": "1.0.0",
+  "description": "The frontend for the WiFi captive portal during the configuration process of the Freezerbot sensors",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.3",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.3",
+    "vue-tsc": "^2.2.8"
+  }
+}

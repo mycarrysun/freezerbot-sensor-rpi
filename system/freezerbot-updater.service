@@ -1,12 +1,12 @@
 [Unit]
-Description=Freezerbot Temperature Monitor
+Description=Freezerbot Firmware Updater
 After=network.target
 
 [Service]
-ExecStart=/home/pi/freezerbot/.venv/bin/python /home/pi/freezerbot/temperature_monitor.py
+Type=oneshot
+ExecStart=/home/pi/freezerbot/.venv/bin/python /home/pi/freezerbot/firmware_updater.py
 WorkingDirectory=/home/pi/freezerbot
-Restart=on-failure
-User=pi
+User=root
 Environment=PATH=/home/pi/freezerbot/.venv/bin:$PATH
 
 [Install]

@@ -2,3 +2,8 @@
 .vscode
 .env
 venv
+config.json
+logs
+backup
+test-config.json
+node_modules
