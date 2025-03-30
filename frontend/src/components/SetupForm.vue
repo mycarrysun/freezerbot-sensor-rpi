@@ -7,7 +7,7 @@
 
       <div v-if="showNetworkList" class="wifi-list">
         <div v-if="isScanning" class="spinner"></div>
-        <div v-else-if="error" class="error-message">{{ error }}</div>
+        <div v-else-if="wifiScanningError" class="error-message">{{ wifiScanningError }}</div>
         <div v-else>
           <div
             v-for="network in networks"
@@ -49,7 +49,6 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
 
-// Define types
 interface FormData {
   wifi_ssid: string;
   wifi_password: string;
@@ -63,12 +62,10 @@ interface ApiResponse {
   networks?: string[];
 }
 
-// Define props and emits
 const emit = defineEmits<{
   (e: 'setup-completed'): void;
 }>();
 
-// Reactive state
 const formData = reactive<FormData>({
   wifi_ssid: '',
   wifi_password: '',
@@ -80,29 +77,28 @@ const networks = ref<string[]>([]);
 const showNetworkList = ref<boolean>(false);
 const isScanning = ref<boolean>(false);
 const isSubmitting = ref<boolean>(false);
-const error = ref<string>('');
+const wifiScanningError = ref<string>('');
 const formError = ref<string>('');
 
-// Methods
 async function scanWifi() {
   showNetworkList.value = true;
   isScanning.value = true;
-  error.value = '';
+  wifiScanningError.value = '';
 
   try {
     const response = await fetch('/api/scan-wifi');
     const data = await response.json() as ApiResponse;
 
     if (data.error) {
-      error.value = data.error;
+      wifiScanningError.value = data.error;
     } else {
       networks.value = data.networks || [];
       if (networks.value.length === 0) {
-        error.value = 'No networks found. Please check that WiFi is enabled on your device.';
+        wifiScanningError.value = 'No networks found. Please check that WiFi is enabled on your device.';
       }
     }
   } catch (err) {
-    error.value = 'Failed to scan networks. Please try again or enter network name manually.';
+    wifiScanningError.value = 'Failed to scan networks. Please try again or enter network name manually.';
     console.error('Error scanning WiFi:', err);
   } finally {
     isScanning.value = false;

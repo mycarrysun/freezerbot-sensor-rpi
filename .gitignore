@@ -7,3 +7,5 @@ logs
 backup
 test-config.json
 node_modules
+raspberry_pi/static/*
+raspberry_pi/templates/*
