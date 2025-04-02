@@ -161,20 +161,20 @@ class FirmwareUpdater:
                 if file.endswith('.service') or file.endswith('.timer'):
                     source_path = os.path.join(self.system_directory, file)
                     destination_path = f"/etc/systemd/system/{file}"
-                    subprocess.run(["sudo", "cp", source_path, destination_path])
+                    subprocess.run(["cp", source_path, destination_path])
 
             # Reload systemd to recognize changes
-            subprocess.run(["sudo", "systemctl", "daemon-reload"])
+            subprocess.run(["systemctl", "daemon-reload"])
 
     def restart_appropriate_service(self):
         """Restart the service based on device's current mode"""
         try:
             if self.device_is_configured:
                 self.logger.info("Restarting monitoring service")
-                subprocess.run(["sudo", "systemctl", "restart", "freezerbot-monitor.service"])
+                subprocess.run(["systemctl", "restart", "freezerbot-monitor.service"])
             else:
                 self.logger.info("Restarting setup service")
-                subprocess.run(["sudo", "systemctl", "restart", "freezerbot-setup.service"])
+                subprocess.run(["systemctl", "restart", "freezerbot-setup.service"])
 
             return True
         except Exception as error:
@@ -222,10 +222,10 @@ class FirmwareUpdater:
                 # Also update systemd files
                 if file.endswith('.service') or file.endswith('.timer'):
                     system_destination = f"/etc/systemd/system/{file}"
-                    subprocess.run(["sudo", "cp", source_path, system_destination])
+                    subprocess.run(["cp", source_path, system_destination])
 
             # Reload systemd
-            subprocess.run(["sudo", "systemctl", "daemon-reload"])
+            subprocess.run(["systemctl", "daemon-reload"])
 
     def run(self):
         """Main entry point for the updater service"""

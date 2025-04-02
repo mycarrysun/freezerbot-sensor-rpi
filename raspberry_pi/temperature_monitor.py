@@ -43,9 +43,9 @@ class TemperatureMonitor:
 
         self.led_control.set_state("reset")
         time.sleep(2)
-        subprocess.Popen(["sudo", "systemctl", "disable", "freezerbot-monitor.service"])
-        subprocess.Popen(["sudo", "systemctl", "enable", "freezerbot-setup.service"])
-        subprocess.Popen(["sudo", "systemctl", "start", "freezerbot-setup.service"])
+        subprocess.Popen(["systemctl", "disable", "freezerbot-monitor.service"])
+        subprocess.Popen(["systemctl", "enable", "freezerbot-setup.service"])
+        subprocess.Popen(["systemctl", "start", "freezerbot-setup.service"])
 
     def read_temperature(self):
         """Read temperature from sensor"""

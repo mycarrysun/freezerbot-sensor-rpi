@@ -32,14 +32,14 @@ class FreezerBotSetup:
 
         self.led_control.set_state("reset")
         time.sleep(2)
-        subprocess.Popen(["sudo", "systemctl", "disable", "freezerbot-monitor.service"])
-        subprocess.Popen(["sudo", "systemctl", "enable", "freezerbot-setup.service"])
-        subprocess.Popen(["sudo", "systemctl", "start", "freezerbot-setup.service"])
+        subprocess.Popen(["systemctl", "disable", "freezerbot-monitor.service"])
+        subprocess.Popen(["systemctl", "enable", "freezerbot-setup.service"])
+        subprocess.Popen(["systemctl", "start", "freezerbot-setup.service"])
 
     def restart_in_sensor_mode(self):
-        subprocess.Popen(["sudo", "systemctl", "enable", "freezerbot-monitor.service"])
-        subprocess.Popen(["sudo", "systemctl", "disable", "freezerbot-setup.service"])
-        subprocess.Popen(["sleep", "10", "&&", "sudo", "reboot"], shell=True)
+        subprocess.Popen(["systemctl", "enable", "freezerbot-monitor.service"])
+        subprocess.Popen(["systemctl", "disable", "freezerbot-setup.service"])
+        subprocess.Popen(["sleep", "10", "&&", "reboot"], shell=True)
 
     def setup_routes(self):
         """Set up the web routes for the configuration portal"""
@@ -61,7 +61,7 @@ class FreezerBotSetup:
     def scan_wifi(self):
         """Scan for available WiFi networks and return as JSON"""
         try:
-            result = subprocess.run(["sudo", "iwlist", "wlan0", "scan"],
+            result = subprocess.run(["iwlist", "wlan0", "scan"],
                                     capture_output=True, text=True)
 
             networks = []
@@ -124,14 +124,14 @@ class FreezerBotSetup:
 
         # Delete all existing WiFi connections
         connections = subprocess.run(
-            ["sudo", "nmcli", "-t", "-f", "NAME,TYPE", "connection", "show"],
+            ["nmcli", "-t", "-f", "NAME,TYPE", "connection", "show"],
             capture_output=True, text=True
         ).stdout.strip().split('\n')
 
         for conn in connections:
             if ':wifi' in conn:
                 conn_name = conn.split(':')[0]
-                subprocess.run(["sudo", "nmcli", "connection", "delete", conn_name],
+                subprocess.run(["nmcli", "connection", "delete", conn_name],
                                stderr=subprocess.DEVNULL)
 
         for i, network in enumerate(networks):
@@ -169,7 +169,7 @@ class FreezerBotSetup:
 
                 # Build the nmcli command for enterprise WiFi
                 enterprise_cmd = [
-                    "sudo", "nmcli", "connection", "add",
+                    "nmcli", "connection", "add",
                     "type", "wifi",
                     "con-name", ssid,
                     "ifname", "wlan0",
@@ -207,7 +207,7 @@ class FreezerBotSetup:
                 # Regular WPA-PSK network configuration
                 print(f"Adding regular WiFi network: {ssid}")
                 subprocess.run([
-                    "sudo", "nmcli", "connection", "add",
+                    "nmcli", "connection", "add",
                     "type", "wifi",
                     "con-name", ssid,
                     "ifname", "wlan0",
@@ -220,7 +220,7 @@ class FreezerBotSetup:
 
             # Enable all advanced connection settings for better reliability
             subprocess.run([
-                "sudo", "nmcli", "connection", "modify", ssid,
+                "nmcli", "connection", "modify", ssid,
                 "connection.autoconnect-retries", "10",  # Retry connection up to 10 times
                 "ipv4.dhcp-timeout", "60",  # Longer DHCP timeout
                 "ipv4.route-metric", "100"  # Lower metric = higher priority route
@@ -265,10 +265,10 @@ class FreezerBotSetup:
             f.write(dnsmasq_config)
 
         # Configure static IP
-        subprocess.run(["sudo", "ifconfig", "wlan0", "192.168.4.1", "netmask", "255.255.255.0"])
+        subprocess.run(["ifconfig", "wlan0", "192.168.4.1", "netmask", "255.255.255.0"])
 
         # Start services
-        subprocess.run(["sudo", "systemctl", "start", "hostapd", "dnsmasq"])
+        subprocess.run(["systemctl", "start", "hostapd", "dnsmasq"])
 
     def run(self):
         """Main entry point"""
