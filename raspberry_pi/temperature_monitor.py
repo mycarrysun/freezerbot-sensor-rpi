@@ -9,6 +9,7 @@ from w1thermsensor import W1ThermSensor
 from datetime import datetime
 
 from raspberry_pi.api import make_api_request
+from raspberry_pi.freezerbot_setup import FreezerBotSetup
 
 
 class TemperatureMonitor:
@@ -20,6 +21,7 @@ class TemperatureMonitor:
         self.config = None
 
         self.led_control = LedControl()
+        self.freezerbot_setup = FreezerBotSetup()
 
         self.led_control.set_state("running")
 
@@ -29,23 +31,12 @@ class TemperatureMonitor:
         """Load the configuration file"""
         if not os.path.exists(self.config_file):
             print("Configuration file not found. Will restart in setup mode.")
-            self.restart_in_setup_mode()
+            self.freezerbot_setup.restart_in_setup_mode()
             return False
 
         with open(self.config_file, "r") as f:
             self.config = json.load(f)
         return True
-
-    def restart_in_setup_mode(self):
-        """Remove config and restart in setup mode - only used when button is explicitly held"""
-        if os.path.exists(self.config_file):
-            os.remove(self.config_file)
-
-        self.led_control.set_state("reset")
-        time.sleep(2)
-        subprocess.Popen(["systemctl", "disable", "freezerbot-monitor.service"])
-        subprocess.Popen(["systemctl", "enable", "freezerbot-setup.service"])
-        subprocess.Popen(["systemctl", "start", "freezerbot-setup.service"])
 
     def read_temperature(self):
         """Read temperature from sensor"""
@@ -91,13 +82,6 @@ class TemperatureMonitor:
     def run(self):
         """Main monitoring loop with resilient error handling"""
         print("Starting temperature monitoring")
-
-        # Initial configuration and connection attempt
-        if self.load_configuration():
-            self.led_control.set_state("running")
-        else:
-            print("No valid configuration found. Will continue monitoring with default settings.")
-            self.led_control.set_state("error")
 
         # Main monitoring loop - continue indefinitely
         while True:
