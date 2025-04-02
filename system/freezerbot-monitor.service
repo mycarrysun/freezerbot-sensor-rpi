@@ -6,7 +6,7 @@ After=network.target
 ExecStart=/home/pi/freezerbot/.venv/bin/python /home/pi/freezerbot/temperature_monitor.py
 WorkingDirectory=/home/pi/freezerbot
 Restart=on-failure
-User=pi
+User=root
 Environment=PATH=/home/pi/freezerbot/.venv/bin:$PATH
 
 [Install]

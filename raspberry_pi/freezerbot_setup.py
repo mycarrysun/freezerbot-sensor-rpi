@@ -5,6 +5,7 @@ import json
 import requests
 import RPi.GPIO as GPIO
 from flask import Flask, request, render_template, redirect, jsonify
+from led_control import LedControl
 
 
 class FreezerBotSetup:
@@ -14,10 +15,8 @@ class FreezerBotSetup:
         self.config_file = "/home/pi/freezerbot/config.json"
         self.is_configured = os.path.exists(self.config_file)
 
-        # Set up GPIO for button with built-in LED
-        self.BUTTON_PIN = 17  # GPIO pin for the reset button
-        self.LED_PIN = 27  # GPIO pin for the button's built-in LED
-        self.setup_gpio()
+        # Initialize LED control
+        self.led_control = LedControl()
 
         # Initialize Flask application
         self.app = Flask(__name__,
@@ -26,37 +25,22 @@ class FreezerBotSetup:
                          template_folder='templates')
         self.setup_routes()
 
-    def setup_gpio(self):
-        """Configure GPIO pins for button and built-in LED"""
-        GPIO.setmode(GPIO.BCM)
 
-        # Setup button with pull-up resistor
-        GPIO.setup(self.BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        GPIO.add_event_detect(self.BUTTON_PIN, GPIO.FALLING,
-                              callback=self.button_pressed_callback,
-                              bouncetime=300)
-
-        # Setup the button's built-in LED
-        GPIO.setup(self.LED_PIN, GPIO.OUT)
-        self.led_pwm = GPIO.PWM(self.LED_PIN, 1)  # 1 Hz for blinking
-
-    def button_pressed_callback(self, channel):
-        """Handle button press events"""
-        # Check how long the button is held
-        start_time = time.time()
-        while GPIO.input(self.BUTTON_PIN) == GPIO.LOW:
-            time.sleep(0.1)
-            if time.time() - start_time > 10:  # 10-second hold
-                self.reset_configuration()
-                break
-
-    def reset_configuration(self):
-        """Reset the device to setup mode"""
+    def restart_in_setup_mode(self):
+        """Remove config and restart in setup mode - only used when button is explicitly held"""
         if os.path.exists(self.config_file):
             os.remove(self.config_file)
-        self.set_led_state("reset")
-        time.sleep(2)  # Give user visual feedback
-        subprocess.Popen(["sudo", "reboot"], shell=True)
+
+        self.led_control.set_state("reset")
+        time.sleep(2)
+        subprocess.Popen(["sudo", "systemctl", "disable", "freezerbot-monitor.service"])
+        subprocess.Popen(["sudo", "systemctl", "enable", "freezerbot-setup.service"])
+        subprocess.Popen(["sudo", "systemctl", "start", "freezerbot-setup.service"])
+
+    def restart_in_sensor_mode(self):
+        subprocess.Popen(["sudo", "systemctl", "enable", "freezerbot-monitor.service"])
+        subprocess.Popen(["sudo", "systemctl", "disable", "freezerbot-setup.service"])
+        subprocess.Popen(["sleep", "10", "&&", "sudo", "reboot"], shell=True)
 
     def setup_routes(self):
         """Set up the web routes for the configuration portal"""
@@ -93,32 +77,27 @@ class FreezerBotSetup:
             return jsonify({"error": str(e), "networks": []})
 
     def save_config(self):
-        """Process and save the configuration"""
+        """Process and save the configuration with multiple WiFi networks"""
         try:
             # Get JSON data
             data = request.json
-            wifi_ssid = data.get('wifi_ssid')
-            wifi_password = data.get('wifi_password')
+            networks = data.get('networks', [])
             api_token = data.get('api_token')
             freezer_name = data.get('freezer_name', 'Unnamed Freezer')
 
             # Validate inputs
-            if not wifi_ssid or not wifi_password or not api_token:
-                return jsonify({"success": False, "error": "All fields are required"})
+            if not networks or not any(network.get('ssid') and network.get('password') for network in networks):
+                return jsonify({
+                    "success": False,
+                    "error": "At least one WiFi network with SSID and password is required"
+                })
 
-            # Test WiFi connection
-            if not self.test_wifi_connection(wifi_ssid, wifi_password):
-                return jsonify({"success": False,
-                                "error": "Could not connect to WiFi. Please check your network name and password"})
-
-            # Test API token
-            if not self.test_api_token(api_token):
-                return jsonify({"success": False, "error": "Invalid API token. Please check your token"})
+            if not api_token:
+                return jsonify({"success": False, "error": "API token is required"})
 
             # Save configuration
             config = {
-                "wifi_ssid": wifi_ssid,
-                "wifi_password": wifi_password,
+                "networks": networks,
                 "api_token": api_token,
                 "freezer_name": freezer_name
             }
@@ -126,10 +105,9 @@ class FreezerBotSetup:
             with open(self.config_file, "w") as f:
                 json.dump(config, f)
 
-            # Schedule restart
-            subprocess.Popen(["sudo", "systemctl", "enable", "freezerbot-monitor.service"])
-            subprocess.Popen(["sudo", "systemctl", "disable", "freezerbot-setup.service"])
-            subprocess.Popen(["sleep", "10", "&&", "sudo", "reboot"], shell=True)
+            self.setup_network_manager(networks)
+
+            self.restart_in_sensor_mode()
 
             return jsonify({"success": True})
         except Exception as e:
@@ -139,48 +117,115 @@ class FreezerBotSetup:
         """Redirect captive portal detection requests to the setup page"""
         return redirect("/")
 
-    def test_wifi_connection(self, ssid, password):
-        """Test connecting to the provided WiFi network"""
-        try:
-            # Create a temporary wpa_supplicant configuration
-            wpa_config = f"""
-            network={{
-                ssid="{ssid}"
-                psk="{password}"
-            }}
-            """
+    def setup_network_manager(self, networks):
+        """Configure NetworkManager with multiple WiFi networks"""
+        # Dictionary of known enterprise networks and their configs
+        enterprise_defaults = {
+        }
 
-            with open("/tmp/wpa_test.conf", "w") as f:
-                f.write(wpa_config)
+        # Delete all existing WiFi connections
+        connections = subprocess.run(
+            ["sudo", "nmcli", "-t", "-f", "NAME,TYPE", "connection", "show"],
+            capture_output=True, text=True
+        ).stdout.strip().split('\n')
 
-            # Try to connect
-            subprocess.run(["sudo", "systemctl", "stop", "hostapd", "dnsmasq"])
-            subprocess.run(["sudo", "wpa_supplicant", "-i", "wlan0", "-c", "/tmp/wpa_test.conf", "-B"])
+        for conn in connections:
+            if ':wifi' in conn:
+                conn_name = conn.split(':')[0]
+                subprocess.run(["sudo", "nmcli", "connection", "delete", conn_name],
+                               stderr=subprocess.DEVNULL)
 
-            time.sleep(5)
+        for i, network in enumerate(networks):
+            ssid = network.get('ssid')
+            password = network.get('password')
 
-            result = subprocess.run(["iwconfig", "wlan0"], capture_output=True, text=True)
-            connected = ssid in result.stdout
+            if not ssid or not password:
+                continue
 
-            subprocess.run(["sudo", "killall", "wpa_supplicant"])
-            subprocess.run(["sudo", "systemctl", "start", "hostapd", "dnsmasq"])
+            priority = len(networks) - i
 
-            return connected
-        except Exception:
-            subprocess.run(["sudo", "systemctl", "start", "hostapd", "dnsmasq"])
-            return False
+            # Check if this is an enterprise network
+            if network.get('enterprise', False):
+                username = network.get('username', '')
+                if not username:
+                    print(f"Skipping enterprise network {ssid}: username required")
+                    continue
 
-    def test_api_token(self, token):
-        """Test the API token with the Freezerbot server"""
-        try:
-            response = requests.post(
-                "https://api.freezerbot.com/v1/devices/verify",
-                headers={"Authorization": f"Bearer {token}"},
-                json={"device_type": "rpi-zero-w"}
-            )
-            return response.status_code == 200
-        except Exception:
-            return False
+                # Get default settings for known networks, or use defaults
+                network_defaults = enterprise_defaults.get(ssid.lower(), {
+                    'eap_method': 'peap',
+                    'phase2_auth': 'mschapv2'
+                })
+
+                eap_method = network.get('eap_method', network_defaults['eap_method'])
+                phase2_auth = network.get('phase2_auth', network_defaults['phase2_auth'])
+
+                print(f"Adding enterprise WiFi network: {ssid}")
+
+                # Identify if CA cert is needed and where it should be installed
+                ca_cert_path = ""
+                if ssid.lower() == 'eduroam':
+                    # For eduroam, we use the built-in Lets Encrypt CA which is trusted
+                    ca_cert_path = "/etc/ssl/certs/ca-certificates.crt"
+
+                # Build the nmcli command for enterprise WiFi
+                enterprise_cmd = [
+                    "sudo", "nmcli", "connection", "add",
+                    "type", "wifi",
+                    "con-name", ssid,
+                    "ifname", "wlan0",
+                    "ssid", ssid,
+                    "wifi-sec.key-mgmt", "wpa-eap"
+                ]
+
+                # Add 802.1x settings
+                enterprise_cmd.extend([
+                    "802-1x.eap", eap_method,
+                    "802-1x.phase2-auth", phase2_auth,
+                    "802-1x.identity", username,
+                    "802-1x.password", password
+                ])
+
+                # Add anonymous identity for eduroam if domain suffix available
+                if 'domain_suffix' in network_defaults:
+                    anon_identity = f"anonymous@{network_defaults['domain_suffix']}"
+                    enterprise_cmd.extend(["802-1x.anonymous-identity", anon_identity])
+
+                # Add CA cert if available
+                if ca_cert_path:
+                    enterprise_cmd.extend(["802-1x.ca-cert", ca_cert_path])
+
+                # Add autoconnect settings
+                enterprise_cmd.extend([
+                    "autoconnect", "yes",
+                    "autoconnect-priority", str(priority + 10)
+                ])
+
+                # Execute the command
+                subprocess.run(enterprise_cmd)
+
+            else:
+                # Regular WPA-PSK network configuration
+                print(f"Adding regular WiFi network: {ssid}")
+                subprocess.run([
+                    "sudo", "nmcli", "connection", "add",
+                    "type", "wifi",
+                    "con-name", ssid,
+                    "ifname", "wlan0",
+                    "ssid", ssid,
+                    "wifi-sec.key-mgmt", "wpa-psk",
+                    "wifi-sec.psk", password,
+                    "autoconnect", "yes",
+                    "autoconnect-priority", str(priority + 10)  # Add 10 to ensure positive values
+                ])
+
+            # Enable all advanced connection settings for better reliability
+            subprocess.run([
+                "sudo", "nmcli", "connection", "modify", ssid,
+                "connection.autoconnect-retries", "10",  # Retry connection up to 10 times
+                "ipv4.dhcp-timeout", "60",  # Longer DHCP timeout
+                "ipv4.route-metric", "100"  # Lower metric = higher priority route
+            ])
 
     def start_hotspot(self):
         """Start the WiFi hotspot for configuration"""
@@ -226,35 +271,13 @@ class FreezerBotSetup:
         # Start services
         subprocess.run(["sudo", "systemctl", "start", "hostapd", "dnsmasq"])
 
-    def set_led_state(self, state):
-        """Control the status LED"""
-        self.led_pwm.stop()
-
-        if state == "setup":
-            # Blinking blue (simulate with on/off pattern)
-            self.led_pwm.start(50)  # 50% duty cycle - half on, half off
-        elif state == "running":
-            # Solid on
-            GPIO.output(self.LED_PIN, GPIO.HIGH)
-        elif state == "error":
-            # Fast blinking
-            self.led_pwm = GPIO.PWM(self.LED_PIN, 5)  # 5 Hz for faster blinking
-            self.led_pwm.start(50)
-        elif state == "reset":
-            # Three quick flashes
-            for _ in range(3):
-                GPIO.output(self.LED_PIN, GPIO.HIGH)
-                time.sleep(0.2)
-                GPIO.output(self.LED_PIN, GPIO.LOW)
-                time.sleep(0.2)
-
     def run(self):
         """Main entry point"""
         if not self.is_configured:
+            # Set LED to blinking
+            self.led_control.set_state("setup")
             # Start in setup mode
             self.start_hotspot()
-            # Set LED to blinking
-            self.set_led_state("setup")
             # Start the web server
             self.app.run(host="0.0.0.0", port=80)
         else:
@@ -263,6 +286,7 @@ class FreezerBotSetup:
 
     def cleanup(self):
         """Clean up GPIO on exit"""
+        self.led_control.cleanup()
         GPIO.cleanup()
 
 
@@ -276,8 +300,4 @@ if __name__ == "__main__":
         print("Setup terminated by user")
     except Exception as e:
         print(f"Error in setup: {str(e)}")
-        # Try to clean up GPIO
-        try:
-            GPIO.cleanup()
-        except:
-            pass
+        GPIO.cleanup()
