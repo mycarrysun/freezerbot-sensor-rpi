@@ -5,5 +5,5 @@ venv
 config.json
 logs
 backup
-test-config.json
+test_config.json
 node_modules

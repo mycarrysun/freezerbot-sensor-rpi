@@ -87,8 +87,8 @@ class FreezerBotSetup:
             # Get JSON data
             data = request.json
             networks = data.get('networks', [])
-            api_token = data.get('api_token')
-            freezer_name = data.get('freezer_name', 'Unnamed Freezer')
+            username = data.get('username')
+            password = data.get('password')
 
             # Validate inputs
             if not networks or not any(network.get('ssid') and network.get('password') for network in networks):
@@ -97,14 +97,17 @@ class FreezerBotSetup:
                     "error": "At least one WiFi network with SSID and password is required"
                 })
 
-            if not api_token:
-                return jsonify({"success": False, "error": "API token is required"})
+            if not username:
+                return jsonify({"success": False, "error": "Username is required"})
+
+            if not password:
+                return jsonify({"success": False, "error": "Password is required"})
 
             # Save configuration
             config = {
                 "networks": networks,
-                "api_token": api_token,
-                "freezer_name": freezer_name
+                "username": username,
+                "password": password
             }
 
             with open(self.config_file, "w") as f:

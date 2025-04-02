@@ -62,40 +62,33 @@ class TestFreezerBotSetup:
         try:
             # Get JSON data
             data = request.json
-            wifi_ssid = data.get('wifi_ssid')
-            wifi_password = data.get('wifi_password')
-            api_token = data.get('api_token')
-            freezer_name = data.get('freezer_name', 'Unnamed Freezer')
+            networks = data.get('networks', [])
+            username = data.get('username')
+            password = data.get('password')
 
             # Validate inputs
-            if not wifi_ssid or not wifi_password or not api_token:
-                print("[TEST] Validation failed: Missing required fields")
-                return jsonify({"success": False, "error": "All fields are required"})
+            if not networks or not any(network.get('ssid') and network.get('password') for network in networks):
+                return jsonify({
+                    "success": False,
+                    "error": "At least one WiFi network with SSID and password is required"
+                })
 
-            # Test WiFi connection - always succeed in test mode
-            print(f"[TEST] Would connect to WiFi network: {wifi_ssid}")
+            if not username:
+                return jsonify({"success": False, "error": "Username is required"})
 
-            # Test API token - only fail for 'invalid_token'
-            if api_token == 'invalid_token':
-                print("[TEST] Invalid API token")
-                return jsonify({"success": False, "error": "Invalid API token. Please check your token"})
+            if not password:
+                return jsonify({"success": False, "error": "Password is required"})
+
 
             # Save configuration to test file
             config = {
-                "wifi_ssid": wifi_ssid,
-                "wifi_password": wifi_password,
-                "api_token": api_token,
-                "freezer_name": freezer_name
+                "networks": networks,
+                "username": username,
+                "password": password,
             }
 
             with open(self.config_file, "w") as f:
                 json.dump(config, f, indent=2)
-
-            print(f"[TEST] Configuration saved:")
-            print(f"  WiFi SSID: {wifi_ssid}")
-            print(f"  WiFi Password: {'*' * len(wifi_password)}")
-            print(f"  API Token: {api_token[:4]}...{api_token[-4:]}")
-            print(f"  Freezer Name: {freezer_name}")
 
             return jsonify({"success": True})
         except Exception as e:

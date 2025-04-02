@@ -51,13 +51,21 @@
 
         <div class="step">
           <label :for="`wifi_password_${index}`">WiFi Password:</label>
-          <input
-            type="password"
-            :id="`wifi_password_${index}`"
-            v-model="network.password"
-            required
-          >
-          <button type="button" class="secondary-button" @click="togglePassword(index)">{{showingPassword[index] ? 'Hide': 'Show'}}</button>
+          <div class="input-with-button">
+            <input
+              :type="showingPassword.includes(index) ? 'text' : 'password'"
+              :id="`wifi_password_${index}`"
+              v-model="network.password"
+              required
+            >
+            <button type="button"
+                    class="secondary-button"
+                    @click="togglePassword(index)"
+            >
+              {{showingPassword.includes(index) ? 'Hide': 'Show'}}
+            </button>
+          </div>
+
         </div>
 
         <div v-if="network.enterprise" class="enterprise-settings">
@@ -166,6 +174,9 @@ function addNetwork() {
 function togglePassword(index: number) {
   if(!showingPassword.value.includes(index)) {
     showingPassword.value.push(index);
+  }else{
+    const thisIndex = showingPassword.value.indexOf(index);
+    showingPassword.value.splice(thisIndex, 1);
   }
 }
 
