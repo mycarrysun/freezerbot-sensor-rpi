@@ -53,36 +53,15 @@ class FirmwareUpdater:
             self.logger.info(f"Creating backup at {backup_path}")
             os.makedirs(backup_path, exist_ok=True)
 
-            self.backup_python_files(backup_path)
-            self.backup_config_file(backup_path)
-            self.backup_system_files(backup_path)
+            # Copy the entire directory contents recursively
+            self.logger.info(f"Backing up all files from {self.base_directory} to {backup_path}")
+            subprocess.run(["cp", "-r", f"{self.base_directory}/.", backup_path],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
             return True, backup_path
         except Exception as error:
             self.logger.error(f"Backup failed: {str(error)}")
             return False, None
-
-    def backup_python_files(self, backup_path):
-        """Back up all Python files from the main directory"""
-        python_files = [file for file in os.listdir(self.base_directory) if file.endswith('.py')]
-        for file in python_files:
-            source_path = os.path.join(self.base_directory, file)
-            subprocess.run(["cp", source_path, backup_path])
-
-    def backup_config_file(self, backup_path):
-        """Back up the configuration file if it exists"""
-        if os.path.exists(self.config_file_path):
-            subprocess.run(["cp", self.config_file_path, backup_path])
-
-    def backup_system_files(self, backup_path):
-        """Back up system service files if they exist"""
-        if os.path.exists(self.system_directory):
-            system_backup_path = os.path.join(backup_path, "system")
-            os.makedirs(system_backup_path, exist_ok=True)
-
-            for file in os.listdir(self.system_directory):
-                source_path = os.path.join(self.system_directory, file)
-                subprocess.run(["cp", source_path, system_backup_path])
 
     def updates_are_available(self):
         """Check if firmware updates are available from the repository"""

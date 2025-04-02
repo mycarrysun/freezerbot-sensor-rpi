@@ -26,10 +26,6 @@ mkdir -p $FREEZERBOT_DIR/logs
 # Set proper ownership
 chown -R pi:pi $FREEZERBOT_DIR
 
-# Copy all files to installation directory
-echo "Copying files to installation directory..."
-cp -r ./* $FREEZERBOT_DIR/
-
 # Create virtual environment
 echo "Setting up Python virtual environment..."
 cd $FREEZERBOT_DIR
