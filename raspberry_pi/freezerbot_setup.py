@@ -268,7 +268,7 @@ class FreezerBotSetup:
         subprocess.run(["/usr/sbin/ip", "addr", "add", "192.168.4.1/24", "dev", "wlan0"])
 
         # Start services
-        subprocess.run(["systemctl", "start", "hostapd", "dnsmasq"])
+        subprocess.run(["/usr/bin/systemctl", "start", "hostapd", "dnsmasq"])
 
     def run(self):
         """Main entry point"""
