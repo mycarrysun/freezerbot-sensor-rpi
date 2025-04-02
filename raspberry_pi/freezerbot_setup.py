@@ -32,14 +32,14 @@ class FreezerBotSetup:
 
         self.led_control.set_state("reset")
         time.sleep(2)
-        subprocess.Popen(["systemctl", "disable", "freezerbot-monitor.service"])
-        subprocess.Popen(["systemctl", "enable", "freezerbot-setup.service"])
-        subprocess.Popen(["systemctl", "start", "freezerbot-setup.service"])
+        subprocess.Popen(["/usr/bin/systemctl", "disable", "freezerbot-monitor.service"])
+        subprocess.Popen(["/usr/bin/systemctl", "enable", "freezerbot-setup.service"])
+        subprocess.Popen(["/usr/bin/systemctl", "start", "freezerbot-setup.service"])
 
     def restart_in_sensor_mode(self):
-        subprocess.Popen(["systemctl", "enable", "freezerbot-monitor.service"])
-        subprocess.Popen(["systemctl", "disable", "freezerbot-setup.service"])
-        subprocess.Popen(["sleep", "10", "&&", "reboot"], shell=True)
+        subprocess.Popen(["/usr/bin/systemctl", "enable", "freezerbot-monitor.service"])
+        subprocess.Popen(["/usr/bin/systemctl", "disable", "freezerbot-setup.service"])
+        subprocess.Popen(["/usr/bin/sleep", "10", "&&", "/usr/sbin/reboot"], shell=True)
 
     def setup_routes(self):
         """Set up the web routes for the configuration portal"""
@@ -238,50 +238,76 @@ class FreezerBotSetup:
 
         hotspot_name = f"Freezerbot-Setup-{serial}"
 
-        # Configure the hostapd.conf file
-        hostapd_config = f"""
-        interface=wlan0
-        driver=nl80211
-        ssid={hotspot_name}
-        hw_mode=g
-        channel=7
-        wmm_enabled=0
-        macaddr_acl=0
-        auth_algs=1
-        ignore_broadcast_ssid=0
-        """
+        # Check if the IP is already assigned and remove it if needed
+        ip_check = subprocess.run(["/usr/sbin/ip", "addr", "show", "dev", "wlan0"],
+                                  capture_output=True, text=True).stdout
+        if "192.168.4.1" in ip_check:
+            subprocess.run(["/usr/sbin/ip", "addr", "del", "192.168.4.1/24", "dev", "wlan0"])
+
+        # Ensure wlan0 is up
+        subprocess.run(["/usr/sbin/ip", "link", "set", "dev", "wlan0", "up"])
+
+        # Set the static IP
+        subprocess.run(["/usr/sbin/ip", "addr", "add", "192.168.4.1/24", "dev", "wlan0"])
+
+        # Unmask hostapd if it's masked
+        subprocess.run(["/usr/bin/systemctl", "unmask", "hostapd.service"])
+
+        # Configure hostapd
+        hostapd_config = f"""interface=wlan0
+    driver=nl80211
+    ssid={hotspot_name}
+    hw_mode=g
+    channel=7
+    wmm_enabled=0
+    macaddr_acl=0
+    auth_algs=1
+    ignore_broadcast_ssid=0
+    """
 
         with open("/etc/hostapd/hostapd.conf", "w") as f:
             f.write(hostapd_config)
 
-        # Configure dnsmasq for DHCP
-        dnsmasq_config = """
-        interface=wlan0
-        dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
-        address=/#/192.168.4.1
-        """
+        # Configure dnsmasq
+        dnsmasq_config = """interface=wlan0
+    dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
+    address=/#/192.168.4.1
+    """
 
         with open("/etc/dnsmasq.conf", "w") as f:
             f.write(dnsmasq_config)
 
-        # Configure static IP
-        subprocess.run(["/usr/sbin/ip", "addr", "add", "192.168.4.1/24", "dev", "wlan0"])
+        # Restart services
+        subprocess.run(["/usr/bin/systemctl", "restart", "dnsmasq.service"])
+        subprocess.run(["/usr/bin/systemctl", "restart", "hostapd.service"])
 
-        # Start services
-        subprocess.run(["/usr/bin/systemctl", "start", "hostapd", "dnsmasq"])
+        # Verify services are running
+        hostapd_status = subprocess.run(["/usr/bin/systemctl", "is-active", "hostapd"],
+                                        capture_output=True, text=True).stdout.strip()
+        dnsmasq_status = subprocess.run(["/usr/bin/systemctl", "is-active", "dnsmasq"],
+                                        capture_output=True, text=True).stdout.strip()
+
+        if hostapd_status != "active" or dnsmasq_status != "active":
+            raise Exception(f"Failed to start services: hostapd={hostapd_status}, dnsmasq={dnsmasq_status}")
 
     def run(self):
         """Main entry point"""
         if not self.is_configured:
             # Set LED to blinking
             self.led_control.set_state("setup")
-            # Start in setup mode
-            self.start_hotspot()
-            # Start the web server
-            self.app.run(host="0.0.0.0", port=80)
+
+            try:
+                # Start in setup mode
+                self.start_hotspot()
+
+                # Start the web server only if hotspot is successfully created
+                self.app.run(host="0.0.0.0", port=80)
+            except Exception as e:
+                print(f"Setup mode failed: {str(e)}")
+                self.led_control.set_state("error")
         else:
-            # Already configured, exit
             print("Device already configured, exiting setup mode")
+            self.restart_in_sensor_mode()
 
     def cleanup(self):
         """Clean up GPIO on exit"""
