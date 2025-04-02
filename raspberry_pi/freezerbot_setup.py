@@ -2,7 +2,6 @@ import os
 import time
 import subprocess
 import json
-import requests
 import RPi.GPIO as GPIO
 from flask import Flask, request, render_template, redirect, jsonify
 from led_control import LedControl

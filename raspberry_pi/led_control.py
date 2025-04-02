@@ -1,14 +1,22 @@
+import os
+
 import RPi.GPIO as GPIO
 import time
 import sys
 import threading
 
+from dotenv import load_dotenv
+
+LED_DISABLED = 'LED_DISABLED'
 
 class LedControl:
     """Class for controlling the button's built-in LED"""
 
     def __init__(self):
         """Initialize the LED control with the specified pin"""
+        load_dotenv(override=True)
+        self.disabled = os.getenv(LED_DISABLED) == 'true'
+
         self.BUTTON_PIN = 17
         self.LED_PIN = 27
         self.pwm = None
@@ -16,6 +24,8 @@ class LedControl:
 
     def setup(self):
         """Configure GPIO pin for button"""
+        if self.disabled:
+            return
         # Setup button with pull-up resistor
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.LED_PIN, GPIO.OUT)
@@ -26,6 +36,8 @@ class LedControl:
 
     def button_pressed_callback(self, channel):
         """Handle button press events"""
+        if self.disabled:
+            return
         # Check how long the button is held
         start_time = time.time()
         while GPIO.input(self.BUTTON_PIN) == GPIO.LOW:
@@ -36,6 +48,8 @@ class LedControl:
 
     def set_state(self, state):
         """Set the LED to different states based on mode"""
+        if self.disabled:
+            return
         # Stop any existing pattern thread
         self.stop_pattern_thread()
 
@@ -76,6 +90,8 @@ class LedControl:
 
     def wifi_issue_pattern(self):
         """LED pattern for WiFi connectivity issues: double-blink with pause"""
+        if self.disabled:
+            return
         while self.running and self.current_state == "wifi_issue":
             # Double blink
             GPIO.output(self.LED_PIN, GPIO.HIGH)
@@ -91,6 +107,8 @@ class LedControl:
 
     def start_pattern_thread(self, pattern_function):
         """Start a thread to run a custom LED pattern"""
+        if self.disabled:
+            return
         if self.pwm:
             self.pwm.stop()
             self.pwm = None
