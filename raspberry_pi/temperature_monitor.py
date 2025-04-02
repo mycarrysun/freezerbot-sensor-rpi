@@ -129,7 +129,7 @@ class TemperatureMonitor:
                 time.sleep(5)
 
                 # Switch back to appropriate state based on connectivity
-                if self.connected_to_wifi:
+                if self.connected_to_wifi():
                     self.led_control.set_state("running")
                 else:
                     self.led_control.set_state("wifi_issue")
