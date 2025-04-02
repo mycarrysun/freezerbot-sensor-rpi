@@ -3,7 +3,7 @@ Description=Freezerbot Setup Service
 After=network.target
 
 [Service]
-ExecStart=/home/pi/freezerbot/.venv/bin/python /home/pi/freezerbot/freezerbot_setup.py
+ExecStart=/home/pi/freezerbot/.venv/bin/python /home/pi/freezerbot/raspberry_pi/freezerbot_setup.py
 WorkingDirectory=/home/pi/freezerbot
 Restart=on-failure
 User=root
