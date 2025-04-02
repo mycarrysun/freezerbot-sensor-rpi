@@ -255,24 +255,24 @@ class FreezerBotSetup:
 
         # Configure hostapd
         hostapd_config = f"""interface=wlan0
-    driver=nl80211
-    ssid={hotspot_name}
-    hw_mode=g
-    channel=7
-    wmm_enabled=0
-    macaddr_acl=0
-    auth_algs=1
-    ignore_broadcast_ssid=0
-    """
+driver=nl80211
+ssid={hotspot_name}
+hw_mode=g
+channel=7
+wmm_enabled=0
+macaddr_acl=0
+auth_algs=1
+ignore_broadcast_ssid=0
+"""
 
         with open("/etc/hostapd/hostapd.conf", "w") as f:
             f.write(hostapd_config)
 
         # Configure dnsmasq
         dnsmasq_config = """interface=wlan0
-    dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
-    address=/#/192.168.4.1
-    """
+dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
+address=/#/192.168.4.1
+"""
 
         with open("/etc/dnsmasq.conf", "w") as f:
             f.write(dnsmasq_config)
