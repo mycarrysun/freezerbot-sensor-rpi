@@ -61,7 +61,7 @@ class FreezerBotSetup:
     def scan_wifi(self):
         """Scan for available WiFi networks and return as JSON"""
         try:
-            result = subprocess.run(["iwlist", "wlan0", "scan"],
+            result = subprocess.run(["/usr/sbin/iwlist", "wlan0", "scan"],
                                     capture_output=True, text=True)
 
             networks = []
@@ -124,14 +124,14 @@ class FreezerBotSetup:
 
         # Delete all existing WiFi connections
         connections = subprocess.run(
-            ["nmcli", "-t", "-f", "NAME,TYPE", "connection", "show"],
+            ["/usr/bin/nmcli", "-t", "-f", "NAME,TYPE", "connection", "show"],
             capture_output=True, text=True
         ).stdout.strip().split('\n')
 
         for conn in connections:
             if ':wifi' in conn:
                 conn_name = conn.split(':')[0]
-                subprocess.run(["nmcli", "connection", "delete", conn_name],
+                subprocess.run(["/usr/bin/nmcli", "connection", "delete", conn_name],
                                stderr=subprocess.DEVNULL)
 
         for i, network in enumerate(networks):
@@ -169,7 +169,7 @@ class FreezerBotSetup:
 
                 # Build the nmcli command for enterprise WiFi
                 enterprise_cmd = [
-                    "nmcli", "connection", "add",
+                    "/usr/bin/nmcli", "connection", "add",
                     "type", "wifi",
                     "con-name", ssid,
                     "ifname", "wlan0",
@@ -207,7 +207,7 @@ class FreezerBotSetup:
                 # Regular WPA-PSK network configuration
                 print(f"Adding regular WiFi network: {ssid}")
                 subprocess.run([
-                    "nmcli", "connection", "add",
+                    "/usr/bin/nmcli", "connection", "add",
                     "type", "wifi",
                     "con-name", ssid,
                     "ifname", "wlan0",
@@ -220,7 +220,7 @@ class FreezerBotSetup:
 
             # Enable all advanced connection settings for better reliability
             subprocess.run([
-                "nmcli", "connection", "modify", ssid,
+                "/usr/bin/nmcli", "connection", "modify", ssid,
                 "connection.autoconnect-retries", "10",  # Retry connection up to 10 times
                 "ipv4.dhcp-timeout", "60",  # Longer DHCP timeout
                 "ipv4.route-metric", "100"  # Lower metric = higher priority route
@@ -265,7 +265,7 @@ class FreezerBotSetup:
             f.write(dnsmasq_config)
 
         # Configure static IP
-        subprocess.run(["ifconfig", "wlan0", "192.168.4.1", "netmask", "255.255.255.0"])
+        subprocess.run(["/usr/sbin/ip", "addr", "add", "192.168.4.1/24", "dev", "wlan0"])
 
         # Start services
         subprocess.run(["systemctl", "start", "hostapd", "dnsmasq"])

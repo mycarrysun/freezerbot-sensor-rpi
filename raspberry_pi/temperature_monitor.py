@@ -55,7 +55,7 @@ class TemperatureMonitor:
 
     def connected_to_wifi(self):
         nm_status = subprocess.run(
-            ["nmcli", "-t", "-f", "DEVICE,STATE", "device", "status"],
+            ["/usr/bin/nmcli", "-t", "-f", "DEVICE,STATE", "device", "status"],
             capture_output=True, text=True
         ).stdout.strip()
 
