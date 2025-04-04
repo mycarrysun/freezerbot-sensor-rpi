@@ -23,6 +23,30 @@ mkdir -p $FREEZERBOT_DIR
 mkdir -p $FREEZERBOT_DIR/backup
 mkdir -p $FREEZERBOT_DIR/logs
 
+# Create device info file with model name and firmware version
+echo "Creating device information file..."
+cd $FREEZERBOT_DIR
+GIT_SHA=$(git rev-parse HEAD)
+
+# Check if MODEL_NAME exists in .env file, otherwise use default
+if [ -f "$FREEZERBOT_DIR/.env" ] && grep -q "MODEL_NAME=" "$FREEZERBOT_DIR/.env"; then
+  MODEL_NAME=$(grep "MODEL_NAME=" "$FREEZERBOT_DIR/.env" | cut -d "=" -f 2)
+else
+  MODEL_NAME="Unknown Sensor"
+fi
+
+# Get Raspberry Pi serial number using the same technique from the setup file
+SERIAL=$(grep "Serial" /proc/cpuinfo | cut -d ":" -f 2 | tr -d " ")
+
+# Create JSON file with model name and firmware version
+cat > $FREEZERBOT_DIR/device_info.json << EOF
+{
+  "model_name": "${MODEL_NAME}",
+  "firmware_version": "$GIT_SHA",
+  "serial": "$SERIAL"
+}
+EOF
+
 # Set proper ownership
 chown -R pi:pi $FREEZERBOT_DIR
 

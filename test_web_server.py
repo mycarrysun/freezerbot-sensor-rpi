@@ -19,7 +19,12 @@ class TestFreezerBotSetup:
 
         # Configuration for testing
         self.config_file = os.path.join(self.base_dir, "test_config.json")
-        self.is_configured = os.path.exists(self.config_file)
+        self.configuration_exists = os.path.exists(self.config_file)
+        self.config = {}
+        if self.configuration_exists:
+            with open(self.config_file, "r") as f:
+                self.config = json.load(f)
+        self.is_configured = 'email' not in self.config or 'password' not in self.config
         self.mock_wifi_networks = ["Home-WiFi", "Office-Net", "FreeWiFi", "Cafe-Guest", "Neighbors-5G"]
 
         # Initialize Flask app
@@ -39,6 +44,7 @@ class TestFreezerBotSetup:
         """Set up the web routes for the configuration portal"""
         self.app.route("/")(self.index)
         self.app.route("/api/scan-wifi")(self.scan_wifi)
+        self.app.route("/api/get-config")(self.get_current_config)
         self.app.route("/api/setup", methods=["POST"])(self.save_config)
 
         # Special routes for captive portal detection (just return success for testing)
@@ -52,6 +58,9 @@ class TestFreezerBotSetup:
         """Serve the main Vue application"""
         return render_template('index.html')
 
+    def get_current_config(self):
+        return jsonify(self.config)
+
     def scan_wifi(self):
         """Mock WiFi scanning functionality"""
         print("[TEST] Scanning for WiFi networks")
@@ -63,7 +72,7 @@ class TestFreezerBotSetup:
             # Get JSON data
             data = request.json
             networks = data.get('networks', [])
-            username = data.get('username')
+            email = data.get('email')
             password = data.get('password')
 
             # Validate inputs
@@ -73,8 +82,8 @@ class TestFreezerBotSetup:
                     "error": "At least one WiFi network with SSID and password is required"
                 })
 
-            if not username:
-                return jsonify({"success": False, "error": "Username is required"})
+            if not email:
+                return jsonify({"success": False, "error": "Email is required"})
 
             if not password:
                 return jsonify({"success": False, "error": "Password is required"})
@@ -83,7 +92,7 @@ class TestFreezerBotSetup:
             # Save configuration to test file
             config = {
                 "networks": networks,
-                "username": username,
+                "email": email,
                 "password": password,
             }
 

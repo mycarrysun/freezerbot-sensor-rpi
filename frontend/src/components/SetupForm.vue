@@ -92,8 +92,8 @@
     </div>
 
     <div class="step">
-      <label for="username">Freezerbot Username:</label>
-      <input type="text" id="username" v-model="formData.username" required>
+      <label for="email">Freezerbot Email:</label>
+      <input type="email" id="email" v-model="formData.email" required>
       <p class="hint">What you use to login to the Freezerbot App</p>
     </div>
 
@@ -112,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, reactive, watch } from 'vue';
 
 interface WiFiNetwork {
   ssid: string;
@@ -123,10 +123,11 @@ interface WiFiNetwork {
   phase2_auth?: string;
 }
 
-interface FormData {
+interface FreezerbotConfig {
   networks: WiFiNetwork[];
-  username: string;
+  email: string;
   password: string;
+  error?: string;
 }
 
 interface ApiResponse {
@@ -139,7 +140,7 @@ const emit = defineEmits<{
   (e: 'setup-completed'): void;
 }>();
 
-const formData = reactive<FormData>({
+const formData = reactive<FreezerbotConfig>({
   networks: [{
     ssid: '',
     password: '',
@@ -148,7 +149,7 @@ const formData = reactive<FormData>({
     eap_method: 'peap',
     phase2_auth: 'mschapv2'
   }],
-  username: '',
+  email: '',
   password: '',
 });
 
@@ -159,6 +160,14 @@ const isScanning = ref<boolean>(false);
 const isSubmitting = ref<boolean>(false);
 const wifiScanningError = ref<string>('');
 const formError = ref<string>('');
+
+watch(() => formData.email, () => {
+  formError.value = '';
+})
+
+watch(() => formData.password, () => {
+  formError.value = '';
+})
 
 function addNetwork() {
   formData.networks.push({
@@ -182,6 +191,27 @@ function togglePassword(index: number) {
 
 function removeNetwork(index: number) {
   formData.networks.splice(index, 1);
+}
+
+async function getCurrentConfig() {
+  const response = await fetch('/api/get-config');
+  const data = await response.json() as FreezerbotConfig;
+
+  if(data.networks){
+    formData.networks = data.networks;
+  }
+
+  if(data.email){
+    formData.email = data.email;
+  }
+
+  if(data.password){
+    formData.password = data.password;
+  }
+
+  if(data.error){
+    formError.value = data.error;
+  }
 }
 
 async function scanWifi(networkIndex: number) {
@@ -248,6 +278,8 @@ async function submitForm() {
     isSubmitting.value = false;
   }
 }
+
+getCurrentConfig();
 </script>
 
 <style scoped>
@@ -259,7 +291,7 @@ label {
   margin-bottom: 5px;
   font-weight: bold;
 }
-input[type="text"], input[type="password"], select {
+input[type="text"], input[type="password"], input[type="email"], select {
   width: 100%;
   padding: 10px;
   border: 1px solid #ddd;

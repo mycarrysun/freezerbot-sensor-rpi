@@ -6,4 +6,5 @@ config.json
 logs
 backup
 test_config.json
+device_info.json
 node_modules

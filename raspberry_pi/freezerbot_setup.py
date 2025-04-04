@@ -12,7 +12,12 @@ class FreezerBotSetup:
         """Initialize the FreezerBot setup application"""
         # Configuration paths
         self.config_file = "/home/pi/freezerbot/config.json"
-        self.is_configured = os.path.exists(self.config_file)
+        self.configuration_exists = os.path.exists(self.config_file)
+        self.config = {}
+        if self.configuration_exists:
+            with open(self.config_file, "r") as f:
+                self.config = json.load(f)
+        self.is_configured = 'email' not in self.config or 'password' not in self.config
 
         # Initialize LED control
         self.led_control = LedControl()
@@ -24,12 +29,13 @@ class FreezerBotSetup:
                          template_folder='templates')
         self.setup_routes()
 
-
-    def restart_in_setup_mode(self):
-        """Remove config and restart in setup mode - only used when button is explicitly held"""
+    def clear_config(self):
         if os.path.exists(self.config_file):
             os.remove(self.config_file)
 
+
+    def restart_in_setup_mode(self):
+        """Restart in setup mode - only used when button is explicitly held"""
         self.led_control.set_state("reset")
         time.sleep(2)
         subprocess.Popen(["/usr/bin/systemctl", "disable", "freezerbot-monitor.service"])
@@ -51,6 +57,7 @@ class FreezerBotSetup:
         """Set up the web routes for the configuration portal"""
         self.app.route("/")(self.index)
         self.app.route("/api/scan-wifi")(self.scan_wifi)
+        self.app.route("/api/get-config")(self.get_current_config)
         self.app.route("/api/setup", methods=["POST"])(self.save_config)
 
         # Special routes for captive portal detection
@@ -63,6 +70,9 @@ class FreezerBotSetup:
     def index(self):
         """Serve the main Vue application"""
         return render_template('index.html')
+
+    def get_current_config(self):
+        return jsonify(self.config)
 
     def scan_wifi(self):
         """Scan for available WiFi networks and return as JSON"""
@@ -87,7 +97,7 @@ class FreezerBotSetup:
             # Get JSON data
             data = request.json
             networks = data.get('networks', [])
-            username = data.get('username')
+            email = data.get('email')
             password = data.get('password')
 
             # Validate inputs
@@ -97,8 +107,8 @@ class FreezerBotSetup:
                     "error": "At least one WiFi network with SSID and password is required"
                 })
 
-            if not username:
-                return jsonify({"success": False, "error": "Username is required"})
+            if not email:
+                return jsonify({"success": False, "error": "Email is required"})
 
             if not password:
                 return jsonify({"success": False, "error": "Password is required"})
@@ -106,7 +116,7 @@ class FreezerBotSetup:
             # Save configuration
             config = {
                 "networks": networks,
-                "username": username,
+                "email": email,
                 "password": password
             }
 

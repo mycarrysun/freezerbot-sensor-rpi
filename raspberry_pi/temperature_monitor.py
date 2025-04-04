@@ -8,7 +8,7 @@ from led_control import LedControl
 from w1thermsensor import W1ThermSensor
 from datetime import datetime
 
-from api import make_api_request
+from api import make_api_request, api_token_exists, set_api_token, make_api_request_with_creds
 from freezerbot_setup import FreezerBotSetup
 
 
@@ -16,6 +16,7 @@ class TemperatureMonitor:
     def __init__(self):
         """Initialize the temperature monitoring application"""
         self.config_file = "/home/pi/freezerbot/config.json"
+        self.device_info_file = "/home/pi/freezerbot/device_info.json"
         self.network_failure_count = 0
         self.consecutive_errors = []
         self.config = None
@@ -37,6 +38,39 @@ class TemperatureMonitor:
         with open(self.config_file, "r") as f:
             self.config = json.load(f)
         return True
+
+    def obtain_api_token(self):
+        if not api_token_exists():
+            device_info = {}
+            if not os.path.exists(self.device_info_file):
+                print("Device info file not found. Continuing.")
+            else:
+                with open(self.device_info_file, "r") as f:
+                    device_info = json.load(f)
+            response = make_api_request_with_creds({
+                'email': self.config['email'],
+                'password': self.config['password'],
+            }, 'sensors/configure', {**device_info, **{
+                'configured_at': datetime.utcnow().isoformat() + 'Z'
+            }})
+
+            if response.status_code == 401:
+                print('Deleting email and password and restarting in setup mode')
+                del self.config['email']
+                del self.config['password']
+                self.config['error'] = 'Email or password is incorrect. Please provide the email and password you use to login to the Freezerbot app.'
+                with open(self.config_file, 'w') as f:
+                    json.dump(self.config, f)
+                self.freezerbot_setup.restart_in_setup_mode()
+            elif response.status_code != 202:
+                print(f'Error obtaining token: {response.status_code} {response.text}')
+            else:
+                print('Saving api token')
+                data = response.json()
+                set_api_token(data['token'])
+        else:
+            print('Api already token exists')
+
 
     def read_temperature(self):
         """Read temperature from sensor"""
@@ -82,6 +116,8 @@ class TemperatureMonitor:
     def run(self):
         """Main monitoring loop with resilient error handling"""
         print("Starting temperature monitoring")
+
+        self.obtain_api_token()
 
         # Main monitoring loop - continue indefinitely
         while True:
