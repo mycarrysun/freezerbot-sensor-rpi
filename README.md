@@ -4,14 +4,14 @@
 
 Components:
 - Raspberry Pi Zero W
-- Momentary push button with built-in LED (waterproof, 16mm or larger)
+- Momentary push button with built-in LED (waterproof, 12mm)
 - Temperature sensor (DS18B20 or similar)
 - Case with button mounting hole
 
 GPIO Connections:
 1. Button with Built-in LED (typically has 4 pins):
    - LED Positive (+) → GPIO 27 (pin 13)
-   - LED Negative (-) → GND (pin 6)
+   - LED Negative (-) → GND (pin 20)
    - First NO terminal → GPIO 17 (pin 11)
    - Second NO terminal → GND (pin 14)
 

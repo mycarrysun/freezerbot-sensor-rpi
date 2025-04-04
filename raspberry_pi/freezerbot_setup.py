@@ -99,6 +99,7 @@ class FreezerBotSetup:
             networks = data.get('networks', [])
             email = data.get('email')
             password = data.get('password')
+            device_name = data.get('deviceName')
 
             # Validate inputs
             if not networks or not any(network.get('ssid') and network.get('password') for network in networks):
@@ -113,11 +114,15 @@ class FreezerBotSetup:
             if not password:
                 return jsonify({"success": False, "error": "Password is required"})
 
+            if not device_name:
+                return jsonify({'success': False, 'error': 'Sensor name is required'})
+
             # Save configuration
             config = {
                 "networks": networks,
                 "email": email,
-                "password": password
+                "password": password,
+                "device_name": device_name
             }
 
             with open(self.config_file, "w") as f:

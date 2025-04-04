@@ -7,6 +7,7 @@ import subprocess
 from led_control import LedControl
 from w1thermsensor import W1ThermSensor
 from datetime import datetime
+from gpiozero import CPUTemperature
 
 from api import make_api_request, api_token_exists, set_api_token, make_api_request_with_creds
 from freezerbot_setup import FreezerBotSetup
@@ -24,8 +25,6 @@ class TemperatureMonitor:
         self.led_control = LedControl()
         self.freezerbot_setup = FreezerBotSetup()
 
-        self.led_control.set_state("running")
-
         self.load_configuration()
 
     def load_configuration(self):
@@ -39,6 +38,12 @@ class TemperatureMonitor:
             self.config = json.load(f)
         return True
 
+    def clear_creds_from_config(self):
+        del self.config['email']
+        del self.config['password']
+        with open(self.config_file, 'w') as f:
+            json.dump(self.config, f)
+
     def obtain_api_token(self):
         if not api_token_exists():
             device_info = {}
@@ -51,23 +56,29 @@ class TemperatureMonitor:
                 'email': self.config['email'],
                 'password': self.config['password'],
             }, 'sensors/configure', {**device_info, **{
+                'name': self.config['device_name'],
                 'configured_at': datetime.utcnow().isoformat() + 'Z'
             }})
 
             if response.status_code == 401:
                 print('Deleting email and password and restarting in setup mode')
-                del self.config['email']
-                del self.config['password']
                 self.config['error'] = 'Email or password is incorrect. Please provide the email and password you use to login to the Freezerbot app.'
                 with open(self.config_file, 'w') as f:
                     json.dump(self.config, f)
+                self.clear_creds_from_config()
                 self.freezerbot_setup.restart_in_setup_mode()
-            elif response.status_code != 202:
+            elif response.status_code != 201:
                 print(f'Error obtaining token: {response.status_code} {response.text}')
             else:
                 print('Saving api token')
                 data = response.json()
-                set_api_token(data['token'])
+                if 'token' in data:
+                    set_api_token(data['token'])
+                    self.clear_creds_from_config()
+                else:
+                    print(f'No token in response: {data}')
+                    self.led_control.set_state('error')
+
         else:
             print('Api already token exists')
 
@@ -86,47 +97,23 @@ class TemperatureMonitor:
 
         return 'wlan0:connected' in nm_status
 
-    def send_temperature(self, temperature):
-        """Send temperature reading to API"""
-        try:
-            payload = {
-                "degrees_c": temperature,
-                "timestamp": datetime.utcnow().isoformat()+'Z'
-            }
-
-            response = make_api_request('sensors/readings', json=payload)
-
-            if response.status_code != 201:
-                print(f"API error: {response.status_code} - {response.text}")
-                self.led_control.set_state("error")
-                return False
-
-            return True
-        except requests.exceptions.RequestException as e:
-            # Network error
-            print(f"Network error sending data: {str(e)}")
-            self.led_control.set_state("wifi_issue")
-            return False
-        except Exception as e:
-            print(f"Error sending data: {str(e)}")
-            self.led_control.set_state("error")
-
-            return False
-
     def run(self):
         """Main monitoring loop with resilient error handling"""
         print("Starting temperature monitoring")
 
-        self.obtain_api_token()
+        self.led_control.set_state("running")
 
         # Main monitoring loop - continue indefinitely
         while True:
             try:
+                self.obtain_api_token()
+
                 temperature = self.read_temperature()
 
                 try:
                     payload = {
                         "degrees_c": temperature,
+                        "cpu_degrees_c": CPUTemperature().temperature,
                         "timestamp": datetime.utcnow().isoformat() + 'Z'
                     }
 

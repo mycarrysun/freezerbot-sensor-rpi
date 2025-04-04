@@ -1,5 +1,11 @@
 <template>
   <form @submit.prevent="submitForm">
+    <div class="step">
+      <label for="deviceName">Sensor name:</label>
+      <input id="deviceName" type="text" v-model="formData.deviceName" required>
+      <p class="hint">This will name the sensor in the Freezerbot app</p>
+    </div>
+
     <div class="networks-container">
       <h3>WiFi Networks</h3>
       <div v-for="(network, index) in formData.networks" :key="index" class="network-entry">
@@ -127,6 +133,7 @@ interface FreezerbotConfig {
   networks: WiFiNetwork[];
   email: string;
   password: string;
+  deviceName: string;
   error?: string;
 }
 
@@ -149,6 +156,7 @@ const formData = reactive<FreezerbotConfig>({
     eap_method: 'peap',
     phase2_auth: 'mschapv2'
   }],
+  deviceName: '',
   email: '',
   password: '',
 });
@@ -250,6 +258,15 @@ async function submitForm() {
       !formData.networks.some(network => network.ssid && network.password)) {
     formError.value = 'At least one WiFi network with SSID and password is required';
     return;
+  }
+
+  if(!formData.email || !formData.password){
+    formError.value = 'Please provide your Freezerbot email and password.';
+    return;
+  }
+
+  if(!formData.deviceName){
+    formError.value = 'Please provide a name for your Freezerbot sensor.';
   }
 
   isSubmitting.value = true;
