@@ -8,8 +8,8 @@ from led_control import LedControl
 from w1thermsensor import W1ThermSensor
 from datetime import datetime
 
-from raspberry_pi.api import make_api_request
-from raspberry_pi.freezerbot_setup import FreezerBotSetup
+from api import make_api_request
+from freezerbot_setup import FreezerBotSetup
 
 
 class TemperatureMonitor:

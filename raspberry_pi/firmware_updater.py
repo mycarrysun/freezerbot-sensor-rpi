@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-import os
-import time
-import json
 import logging
+import os
 import subprocess
 from datetime import datetime
-from pathlib import Path
 
 
 class FirmwareUpdater:
