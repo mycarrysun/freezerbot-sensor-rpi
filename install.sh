@@ -9,6 +9,7 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+echo "We have a new line in the install.sh"
 echo "Beginning Freezerbot installation..."
 
 # Install system packages
