@@ -109,8 +109,9 @@ class FirmwareUpdater:
 
             sleep(5)
 
-            monitor_status = subprocess.run(["/usr/bin/sudo", '/usr/bin/systemctl', 'status', 'freezerbot-monitor.service'], capture_output=True, text=True, check=True)
-            setup_status = subprocess.run(["/usr/bin/sudo", '/usr/bin/systemctl', 'status', 'freezerbot-setup.service'], capture_output=True, text=True, check=True)
+            # don't set check=True on these commands because one of them will return exit code 3 for disabled
+            monitor_status = subprocess.run(["/usr/bin/sudo", '/usr/bin/systemctl', 'status', 'freezerbot-monitor.service'], capture_output=True, text=True)
+            setup_status = subprocess.run(["/usr/bin/sudo", '/usr/bin/systemctl', 'status', 'freezerbot-setup.service'], capture_output=True, text=True)
 
             if 'active (running)' not in monitor_status or setup_status:
                 self.logger.error('Monitor or setup service is not running after applying updates. Rolling back.')
