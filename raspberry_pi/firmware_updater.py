@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 import logging
 import os
+import subprocess
 import traceback
 from datetime import datetime
 from time import sleep
-import sh
-from sh import ErrorReturnCode
 
 
 class FirmwareUpdater:
@@ -44,6 +43,41 @@ class FirmwareUpdater:
         if not os.path.exists(self.backup_directory):
             os.makedirs(self.backup_directory)
 
+    def run_command_with_logging(self, command, log_prefix="Command", check=True):
+        """Run a command and log its output"""
+        self.logger.info(f"Running: {' '.join(command)}")
+
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=check
+            )
+
+            # Log stdout if present
+            if result.stdout.strip():
+                for line in result.stdout.strip().split('\n'):
+                    self.logger.info(f"{log_prefix} stdout: {line}")
+
+            # Log stderr if present (as info if command succeeded, as error if it failed)
+            if result.stderr.strip():
+                log_level = logging.ERROR if result.returncode != 0 else logging.INFO
+                for line in result.stderr.strip().split('\n'):
+                    self.logger.log(log_level, f"{log_prefix} stderr: {line}")
+
+            # Raise if check=True and command failed
+            if check and result.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    result.returncode, command, result.stdout, result.stderr
+                )
+
+            return result
+
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"{log_prefix} failed with exit code {e.returncode}")
+            raise
+
     def create_timestamped_backup(self):
         """Back up current installation before applying updates"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -55,13 +89,16 @@ class FirmwareUpdater:
         # Copy the entire directory contents recursively
         self.logger.info(f"Backing up all files from {self.base_directory} to {backup_path}")
         try:
-            # Configure sudo cp command with logging
-            sudo_cp = sh.sudo.bake("cp", _err_to_out=True,
-                                   _out=lambda line: self.logger.info(f"Backup: {line.strip()}"))
-            sudo_cp("-r", f"{self.base_directory}/.", backup_path)
+            self.run_command_with_logging(
+                ["/usr/bin/sudo", "/usr/bin/cp", "-r", f"{self.base_directory}/.", backup_path],
+                log_prefix="Backup"
+            )
             return backup_path
-        except ErrorReturnCode as e:
-            self.logger.error(f"Backup failed with exit code {e.exit_code}")
+        except subprocess.CalledProcessError:
+            self.logger.error(f"Backup command failed: {traceback.format_exc()}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Backup failed: {traceback.format_exc()}")
             return None
 
     def updates_are_available(self):
@@ -72,15 +109,22 @@ class FirmwareUpdater:
         try:
             os.chdir(self.base_directory)
 
-            # Configure git command with logging
-            git = sh.git.bake(_err_to_out=True, _out=lambda line: self.logger.info(f"Git: {line.strip()}"))
-
             # Fetch latest changes
-            git.fetch("origin")
+            self.run_command_with_logging(["/usr/bin/git", "fetch", "origin"], log_prefix="Git fetch")
 
-            # Get current and remote commit hashes
-            current_commit = git("rev-parse", "HEAD").strip()
-            remote_commit = git("rev-parse", "origin/main").strip()
+            # Get current commit hash
+            current_result = self.run_command_with_logging(
+                ["/usr/bin/git", "rev-parse", "HEAD"],
+                log_prefix="Git current"
+            )
+            current_commit = current_result.stdout.strip()
+
+            # Get remote commit hash
+            remote_result = self.run_command_with_logging(
+                ["/usr/bin/git", "rev-parse", "origin/main"],
+                log_prefix="Git remote"
+            )
+            remote_commit = remote_result.stdout.strip()
 
             os.chdir(current_directory)
 
@@ -91,7 +135,7 @@ class FirmwareUpdater:
                 self.logger.info("No updates available")
 
             return has_updates
-        except ErrorReturnCode as e:
+        except subprocess.CalledProcessError:
             self.logger.error(f"Git command failed: {traceback.format_exc()}")
             os.chdir(current_directory)
             return False
@@ -106,39 +150,38 @@ class FirmwareUpdater:
         try:
             os.chdir(self.base_directory)
 
-            # Configure git and sudo commands with logging
-            git = sh.git.bake(_err_to_out=True, _out=lambda line: self.logger.info(f"Git update: {line.strip()}"))
-            sudo = sh.sudo.bake(_err_to_out=True, _out=lambda line: self.logger.info(f"Install: {line.strip()}"))
-
             # Pull latest changes
             self.logger.info("Pulling latest changes")
-            git.reset("--hard", "origin/main")
+            self.run_command_with_logging(
+                ["/usr/bin/git", "reset", "--hard", "origin/main"],
+                log_prefix="Git reset"
+            )
 
             # Run install script
             self.logger.info('Running install script after pulling new changes')
-            sudo(f"{self.base_directory}/install.sh")
+            self.run_command_with_logging(
+                ["/usr/bin/sudo", f"{self.base_directory}/install.sh"],
+                log_prefix="Install"
+            )
 
             sleep(5)
 
             # Check service status
-            sudo_systemctl = sh.sudo.bake("systemctl", _err_to_out=False)
-            try:
-                monitor_status = sudo_systemctl("status", "freezerbot-monitor.service", _ok_code=[0, 3])
-                self.logger.info(f"Monitor status: {monitor_status}")
-            except ErrorReturnCode as e:
-                monitor_status = e.stdout
-                self.logger.warning(f"Monitor status check returned non-zero: {traceback.format_exc()}")
+            monitor_status = self.run_command_with_logging(
+                ["/usr/bin/sudo", "/usr/bin/systemctl", "status", "freezerbot-monitor.service"],
+                log_prefix="Monitor status",
+                check=False  # Don't raise exception on non-zero exit
+            )
 
-            try:
-                setup_status = sudo_systemctl("status", "freezerbot-setup.service", _ok_code=[0, 3])
-                self.logger.info(f"Setup status: {setup_status}")
-            except ErrorReturnCode as e:
-                setup_status = e.stdout
-                self.logger.warning(f"Setup status check returned non-zero: {traceback.format_exc()}")
+            setup_status = self.run_command_with_logging(
+                ["/usr/bin/sudo", "/usr/bin/systemctl", "status", "freezerbot-setup.service"],
+                log_prefix="Setup status",
+                check=False  # Don't raise exception on non-zero exit
+            )
 
             # Check if either service is running
-            if 'active (running)' not in str(monitor_status) and 'active (running)' not in str(setup_status):
-                self.logger.error('Monitor or setup service is not running after applying updates. Rolling back.')
+            if 'active (running)' not in monitor_status.stdout and 'active (running)' not in setup_status.stdout:
+                self.logger.error('Neither monitor nor setup service is running after applying updates. Rolling back.')
                 os.chdir(current_directory)
                 self.rollback_to_backup(backup_path)
                 return False
@@ -158,19 +201,19 @@ class FirmwareUpdater:
         try:
             self.logger.info(f"Rolling back to backup: {backup_path}")
 
-            # Configure sudo commands with logging
-            sudo = sh.sudo.bake(_err_to_out=True, _out=lambda line: self.logger.info(f"Rollback: {line.strip()}"))
-
             # Move backup to base directory
-            sudo("mv", "-T", backup_path, self.base_directory)
+            self.run_command_with_logging(
+                ["/usr/bin/sudo", "/usr/bin/mv", "-T", backup_path, self.base_directory],
+                log_prefix="Rollback mv"
+            )
 
             self.logger.info('Running install script after rollback')
-            sudo(f"{self.base_directory}/install.sh")
+            self.run_command_with_logging(
+                ["/usr/bin/sudo", f"{self.base_directory}/install.sh"],
+                log_prefix="Rollback install"
+            )
 
             return True
-        except ErrorReturnCode as e:
-            self.logger.error(f"Rollback failed with exit code {traceback.format_exc()}")
-            return False
         except Exception as error:
             self.logger.error(f"Rollback failed: {traceback.format_exc()}")
             return False
