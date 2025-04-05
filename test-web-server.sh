@@ -10,4 +10,5 @@ echo "Installing dependencies..."
 pip install -r requirements.txt
 
 echo "Starting test application..."
+cd raspberry_pi
 python test_web_server.py

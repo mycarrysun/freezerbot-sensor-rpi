@@ -5,8 +5,9 @@ Run this on your development machine to test the web interface before deploying 
 """
 
 import os
-import json
+
 from flask import Flask, request, render_template, redirect, jsonify
+from config import Config
 
 
 class TestFreezerBotSetup:
@@ -17,22 +18,16 @@ class TestFreezerBotSetup:
         # Find the directory where this script is located
         self.base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)))
 
-        # Configuration for testing
-        self.config_file = os.path.join(self.base_dir, "test_config.json")
-        self.configuration_exists = os.path.exists(self.config_file)
-        self.config = {}
-        if self.configuration_exists:
-            with open(self.config_file, "r") as f:
-                self.config = json.load(f)
-        self.is_configured = 'email' not in self.config or 'password' not in self.config
+        self.config = Config('test_config.json')
+
         self.mock_wifi_networks = ["Home-WiFi", "Office-Net", "FreeWiFi", "Cafe-Guest", "Neighbors-5G"]
 
         # Initialize Flask app
         # For testing, we'll just serve the static files directly
         self.app = Flask(__name__,
                          static_url_path='',
-                         static_folder=os.path.join(self.base_dir, 'raspberry_pi', 'static'),
-                         template_folder=os.path.join(self.base_dir, 'raspberry_pi', 'templates'))
+                         static_folder=os.path.join(self.base_dir, 'static'),
+                         template_folder=os.path.join(self.base_dir, 'templates'))
 
         # Debug output to help troubleshoot template location
         print(f"Template folder: {self.app.template_folder}")
@@ -59,7 +54,7 @@ class TestFreezerBotSetup:
         return render_template('index.html')
 
     def get_current_config(self):
-        return jsonify(self.config)
+        return jsonify(self.config.config)
 
     def scan_wifi(self):
         """Mock WiFi scanning functionality"""
@@ -74,7 +69,7 @@ class TestFreezerBotSetup:
             networks = data.get('networks', [])
             email = data.get('email')
             password = data.get('password')
-            device_name = data.get('deviceName')
+            device_name = data.get('device_name')
 
             # Validate inputs
             if not networks or not any(network.get('ssid') and network.get('password') for network in networks):
@@ -101,8 +96,7 @@ class TestFreezerBotSetup:
                 "device_name": device_name
             }
 
-            with open(self.config_file, "w") as f:
-                json.dump(config, f, indent=2)
+            self.config.save_new_config(config)
 
             return jsonify({"success": True})
         except Exception as e:

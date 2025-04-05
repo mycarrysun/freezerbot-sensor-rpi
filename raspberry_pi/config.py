@@ -4,8 +4,9 @@ import json
 from api import api_token_exists
 
 class Config:
-    def __init__(self):
-        self.config_file = "/home/pi/freezerbot/config.json"
+    def __init__(self, filename='config.json'):
+        self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.config_file = os.path.join(self.base_dir, filename)
         self.configuration_exists = os.path.exists(self.config_file)
         self.config = {}
         if self.configuration_exists:
@@ -19,7 +20,7 @@ class Config:
 
     def save_new_config(self, new_config):
         with open(self.config_file, "w") as f:
-            json.dump(new_config, f)
+            json.dump(new_config, f, indent=2)
         self.config = new_config
 
     def clear_creds_from_config(self):

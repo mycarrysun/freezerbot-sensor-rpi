@@ -38,11 +38,12 @@ class FreezerBotSetup:
         # Re-enable NetworkManager control of wlan0
         subprocess.run(["/usr/bin/nmcli", "device", "set", "wlan0", "managed", "yes"])
 
-        subprocess.run(["/usr/bin/systemctl", "stop", "hostapd.service"])
-        subprocess.run(["/usr/bin/systemctl", "stop", "dnsmasq.service"])
+        subprocess.Popen(["/usr/bin/systemctl", "stop", "hostapd.service"])
+        subprocess.Popen(["/usr/bin/systemctl", "stop", "dnsmasq.service"])
 
         subprocess.run(["/usr/bin/systemctl", "enable", "freezerbot-monitor.service"])
-        subprocess.run(["/usr/bin/systemctl", "disable", "freezerbot-setup.service"])
+        subprocess.run(["/usr/bin/systemctl", "start", "freezerbot-monitor.service"])
+        subprocess.Popen(["/usr/bin/systemctl", "disable", "freezerbot-setup.service"])
 
     def setup_routes(self):
         """Set up the web routes for the configuration portal"""
@@ -90,7 +91,7 @@ class FreezerBotSetup:
             networks = data.get('networks', [])
             email = data.get('email')
             password = data.get('password')
-            device_name = data.get('deviceName')
+            device_name = data.get('device_name')
 
             # Validate inputs
             if not networks or not any(network.get('ssid') and network.get('password') for network in networks):

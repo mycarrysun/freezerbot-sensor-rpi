@@ -1,8 +1,8 @@
 <template>
   <form @submit.prevent="submitForm">
     <div class="step">
-      <label for="deviceName">Sensor name:</label>
-      <input id="deviceName" type="text" v-model="formData.deviceName" required>
+      <label for="device_name">Sensor name:</label>
+      <input id="device_name" type="text" v-model="formData.device_name" required>
       <p class="hint">This will name the sensor in the Freezerbot app</p>
     </div>
 
@@ -133,7 +133,7 @@ interface FreezerbotConfig {
   networks: WiFiNetwork[];
   email: string;
   password: string;
-  deviceName: string;
+  device_name: string;
   error?: string;
 }
 
@@ -156,7 +156,7 @@ const formData = reactive<FreezerbotConfig>({
     eap_method: 'peap',
     phase2_auth: 'mschapv2'
   }],
-  deviceName: '',
+  device_name: '',
   email: '',
   password: '',
 });
@@ -204,6 +204,10 @@ function removeNetwork(index: number) {
 async function getCurrentConfig() {
   const response = await fetch('/api/get-config');
   const data = await response.json() as FreezerbotConfig;
+
+  if(data.device_name){
+    formData.device_name = data.device_name;
+  }
 
   if(data.networks){
     formData.networks = data.networks;
@@ -265,7 +269,7 @@ async function submitForm() {
     return;
   }
 
-  if(!formData.deviceName){
+  if(!formData.device_name){
     formError.value = 'Please provide a name for your Freezerbot sensor.';
   }
 
