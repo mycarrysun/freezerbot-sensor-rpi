@@ -206,7 +206,7 @@ class FirmwareUpdater:
 
             # Move backup to base directory
             self.run_command_with_logging(
-                ["/usr/bin/sudo", "/usr/bin/mv", "-T", backup_path, self.base_directory],
+                ["/usr/bin/sudo", "/usr/bin/mv", f'{backup_path}/', f'{self.base_directory}/'],
                 log_prefix="Rollback mv"
             )
 
