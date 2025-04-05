@@ -370,11 +370,16 @@ class FirmwareUpdater:
                     self.logger.info('Obtaining new api token')
                     TemperatureMonitor().obtain_api_token()
                 errors = []
-                if 'errors' in self.update_history['attempts'][-1]:
-                    errors = self.update_history['attempts'][-1]['errors']
+                failure_count = len(self.update_history['attempts'])
+                last_attempt = self.update_history['attempts'][-1]
+                last_success = 0
+                if 'errors' in last_attempt:
+                    errors = last_attempt['errors']
+                if 'last_success' in self.update_history:
+                    last_success = self.update_history['last_success']
                 payload = {
                     'errors': [
-                        'Errors updating firmware',
+                        f'Errors updating firmware - failure count: {failure_count} - last success: {last_success}',
                         *errors
                     ]
                 }
