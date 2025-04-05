@@ -1,11 +1,13 @@
 import os
 import time
 import json
+import traceback
+
 import requests
 import RPi.GPIO as GPIO
 import subprocess
 from led_control import LedControl
-from w1thermsensor import W1ThermSensor
+from w1thermsensor import W1ThermSensor, NoSensorFoundError
 from datetime import datetime
 from gpiozero import CPUTemperature
 
@@ -45,13 +47,17 @@ class TemperatureMonitor:
             else:
                 with open(self.device_info_file, "r") as f:
                     device_info = json.load(f)
-            response = make_api_request_with_creds({
-                'email': self.config.config['email'],
-                'password': self.config.config['password'],
-            }, 'sensors/configure', json={**device_info, **{
-                'name': self.config.config['device_name'],
-                'configured_at': datetime.utcnow().isoformat() + 'Z'
-            }})
+            response = make_api_request_with_creds(
+                {
+                    'email': self.config.config['email'],
+                    'password': self.config.config['password'],
+                },
+                'sensors/configure',
+                json={**device_info, **{
+                    'name': self.config.config['device_name'],
+                    'configured_at': datetime.utcnow().isoformat() + 'Z'
+                }}
+            )
 
             if response.status_code == 401:
                 print('Deleting email and password and restarting in setup mode')
@@ -76,7 +82,13 @@ class TemperatureMonitor:
 
     def read_temperature(self):
         """Read temperature from sensor"""
-        sensor = W1ThermSensor()
+        try:
+            sensor = W1ThermSensor()
+        except NoSensorFoundError as e:
+            make_api_request('sensors/reportError', json={
+                'errors': [traceback.format_exc()]
+            })
+            raise
         degrees_c = sensor.get_temperature()
         return degrees_c
 
@@ -120,14 +132,14 @@ class TemperatureMonitor:
                     # Network error
                     print(f"Network error sending data: {str(e)}")
                     self.led_control.set_state("wifi_issue")
-                    self.consecutive_errors.append(str(e))
+                    self.consecutive_errors.append(traceback.format_exc())
                 except Exception as e:
                     print(f"Error sending data: {str(e)}")
                     self.led_control.set_state("error")
-                    self.consecutive_errors.append(str(e))
+                    self.consecutive_errors.append(traceback.format_exc())
 
                 if len(self.consecutive_errors) > 0:
-                    response = make_api_request('sensors/errors', json={
+                    response = make_api_request('sensors/reportError', json={
                         'errors': self.consecutive_errors
                     })
 
