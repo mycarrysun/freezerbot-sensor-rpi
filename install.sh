@@ -20,9 +20,9 @@ apt-get install -y python3-venv python3-pip git hostapd dnsmasq
 # Create directory structure
 echo "Setting up directory structure..."
 mkdir -p /home/pi/freezerbot-backups
+mkdir -p /home/pi/freezerbot-logs
 FREEZERBOT_DIR="/home/pi/freezerbot"
 mkdir -p $FREEZERBOT_DIR
-mkdir -p $FREEZERBOT_DIR/logs
 
 # Create device info file with model name and firmware version
 echo "Creating device information file..."

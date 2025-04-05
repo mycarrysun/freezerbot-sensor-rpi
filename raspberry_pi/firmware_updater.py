@@ -20,7 +20,7 @@ class FirmwareUpdater:
 
     def setup_logging(self):
         """Configure logging for the updater service"""
-        log_file_path = f"{self.base_directory}/logs/freezerbot-updater.log"
+        log_file_path = f"/home/pi/freezerbot-logs/freezerbot-updater.log"
         logging_format = '%(asctime)s - %(levelname)s - %(message)s'
 
         logging.basicConfig(
