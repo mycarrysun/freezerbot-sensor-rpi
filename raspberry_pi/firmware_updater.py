@@ -77,7 +77,8 @@ class FirmwareUpdater:
             self.logger.error(f"Failed to save update history: {traceback.format_exc()}")
 
     def add_error_to_update_attempt(self, error: str):
-        self.update_history['attempts'][-1]['errors'] = self.update_history['attempts'][-1]['errors'] or []
+        if 'errors' not in self.update_history['attempts'][-1]:
+            self.update_history['attempts'][-1]['errors'] = []
         self.update_history['attempts'][-1]['errors'].append(error)
         self.save_update_history()
 
