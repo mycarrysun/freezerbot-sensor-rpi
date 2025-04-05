@@ -1,6 +1,7 @@
 import os
 import json
 
+from api import api_token_exists
 
 class Config:
     def __init__(self):
@@ -10,7 +11,7 @@ class Config:
         if self.configuration_exists:
             with open(self.config_file, "r") as f:
                 self.config = json.load(f)
-        self.is_configured = 'email' in self.config and 'password' in self.config
+        self.is_configured = 'email' in self.config and 'password' in self.config or api_token_exists()
 
     def clear_config(self):
         if os.path.exists(self.config_file):
