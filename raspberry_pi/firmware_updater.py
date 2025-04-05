@@ -203,10 +203,13 @@ class FirmwareUpdater:
 
         try:
             self.logger.info(f"Rolling back to backup: {backup_path}")
-
+            self.run_command_with_logging(
+                ['/usr/bin/rm', '-rf', self.base_directory],
+                log_prefix='Remove freezerbot'
+            )
             # Move backup to base directory
             self.run_command_with_logging(
-                ["/usr/bin/sudo", "/usr/bin/mv", f'{backup_path}/', f'{self.base_directory}/'],
+                ["/usr/bin/sudo", "/usr/bin/mv", backup_path, self.base_directory],
                 log_prefix="Rollback mv"
             )
 
