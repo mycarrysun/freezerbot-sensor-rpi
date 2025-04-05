@@ -9,7 +9,14 @@ from time import sleep
 
 
 class FirmwareUpdater:
-    """Handles automatic firmware updates for Freezerbot devices with recovery capability"""
+    """
+    Handles automatic firmware updates for Freezerbot devices with recovery capability
+
+    CAUTION: Be very careful when updating this file or the install.sh script
+    Bugs will cause a rollback on the first 2 attempts, but on the third attempt no backup is created and will be rolled
+    forward without verification of success. This is to allow bug fixes to be pulled when they exist in this script or
+    the install.sh script. See: Updater Bootstrapping Problem
+    """
 
     def __init__(self):
         self.initialize_paths()
