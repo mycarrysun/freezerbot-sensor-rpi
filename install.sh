@@ -80,7 +80,7 @@ systemctl start freezerbot-updater.timer
 
 # Set up startup script to run at boot
 echo "Setting up startup script..."
-echo "@reboot $FREEZERBOT_DIR/.venv/bin/python $FREEZERBOT_DIR/start.py" | crontab -u pi -
+echo "@reboot $FREEZERBOT_DIR/.venv/bin/python $FREEZERBOT_DIR/start.py >> $FREEZERBOT_DIR/logs/start.log" | crontab -u pi -
 
 echo "Installation complete! Reboot to start in setup mode."
 echo "Run 'sudo reboot' to start the Freezerbot setup process."
