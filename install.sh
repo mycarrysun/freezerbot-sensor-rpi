@@ -9,9 +9,6 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-echo "failing on purpose temporarily for testing firmware updater"
-exit 123
-
 echo "Beginning Freezerbot installation..."
 
 # Install system packages
