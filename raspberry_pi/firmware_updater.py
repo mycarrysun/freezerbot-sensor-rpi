@@ -372,13 +372,14 @@ class FirmwareUpdater:
                 errors = []
                 if 'errors' in self.update_history['attempts'][-1]:
                     errors = self.update_history['attempts'][-1]['errors']
-                self.logger.info(f'Sending api request with:\n'+'\n'.join(errors))
-                response = make_api_request('sensors/errors', json={
+                payload = {
                     'errors': [
                         'Errors updating firmware',
                         *errors
                     ]
-                })
+                }
+                self.logger.info(f'Sending api request with:\n{payload}')
+                response = make_api_request('sensors/errors', json=payload)
                 if response.status_code != 200:
                     self.logger.error(f'Error sending api request: {response.status_code} - {response.text}')
                 else:
