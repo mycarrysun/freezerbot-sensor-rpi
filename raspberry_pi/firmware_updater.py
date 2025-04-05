@@ -134,7 +134,7 @@ class FirmwareUpdater:
         try:
             self.logger.info(f"Rolling back to backup: {backup_path}")
 
-            subprocess.run(["/usr/bin/sudo", "/usr/bin/mv", backup_path, self.base_directory], check=True)
+            subprocess.run(["/usr/bin/sudo", "/usr/bin/mv", "-T", backup_path, self.base_directory], check=True)
 
             self.logger.info('Running install script after rollback')
             subprocess.run(["/usr/bin/sudo", f'{self.base_directory}/install.sh'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
