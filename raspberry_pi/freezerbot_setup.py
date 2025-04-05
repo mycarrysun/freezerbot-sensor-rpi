@@ -5,19 +5,14 @@ import json
 import RPi.GPIO as GPIO
 from flask import Flask, request, render_template, redirect, jsonify
 from led_control import LedControl
+from config import Config
 
 
 class FreezerBotSetup:
     def __init__(self):
         """Initialize the FreezerBot setup application"""
         # Configuration paths
-        self.config_file = "/home/pi/freezerbot/config.json"
-        self.configuration_exists = os.path.exists(self.config_file)
-        self.config = {}
-        if self.configuration_exists:
-            with open(self.config_file, "r") as f:
-                self.config = json.load(f)
-        self.is_configured = 'email' not in self.config or 'password' not in self.config
+        self.config = Config()
 
         # Initialize LED control
         self.led_control = LedControl()
@@ -28,10 +23,6 @@ class FreezerBotSetup:
                          static_folder='static',
                          template_folder='templates')
         self.setup_routes()
-
-    def clear_config(self):
-        if os.path.exists(self.config_file):
-            os.remove(self.config_file)
 
 
     def restart_in_setup_mode(self):
@@ -72,7 +63,7 @@ class FreezerBotSetup:
         return render_template('index.html')
 
     def get_current_config(self):
-        return jsonify(self.config)
+        return jsonify(self.config.config)
 
     def scan_wifi(self):
         """Scan for available WiFi networks and return as JSON"""
@@ -125,8 +116,7 @@ class FreezerBotSetup:
                 "device_name": device_name
             }
 
-            with open(self.config_file, "w") as f:
-                json.dump(config, f)
+            self.config.save_new_config(config)
 
             self.setup_network_manager(networks)
 
@@ -319,7 +309,7 @@ address=/#/192.168.4.1
 
     def run(self):
         """Main entry point"""
-        if not self.is_configured:
+        if not self.config.is_configured:
             # Set LED to blinking
             self.led_control.set_state("setup")
 

@@ -11,38 +11,32 @@ from gpiozero import CPUTemperature
 
 from api import make_api_request, api_token_exists, set_api_token, make_api_request_with_creds
 from freezerbot_setup import FreezerBotSetup
+from config import Config
 
 
 class TemperatureMonitor:
     def __init__(self):
         """Initialize the temperature monitoring application"""
-        self.config_file = "/home/pi/freezerbot/config.json"
+        self.config = Config()
         self.device_info_file = "/home/pi/freezerbot/device_info.json"
         self.network_failure_count = 0
         self.consecutive_errors = []
-        self.config = None
 
         self.led_control = LedControl()
         self.freezerbot_setup = FreezerBotSetup()
 
-        self.load_configuration()
+        self.validate_config()
 
-    def load_configuration(self):
-        """Load the configuration file"""
-        if not os.path.exists(self.config_file):
+    def validate_config(self):
+        """Check for a valid config file"""
+        if not self.config.configuration_exists:
             print("Configuration file not found. Will restart in setup mode.")
             self.freezerbot_setup.restart_in_setup_mode()
-            return False
-
-        with open(self.config_file, "r") as f:
-            self.config = json.load(f)
-        return True
-
-    def clear_creds_from_config(self):
-        del self.config['email']
-        del self.config['password']
-        with open(self.config_file, 'w') as f:
-            json.dump(self.config, f)
+            return
+        if not self.config.is_configured:
+            print("Configuration file is invalid. Restarting in setup mode.")
+            self.freezerbot_setup.restart_in_setup_mode()
+            return
 
     def obtain_api_token(self):
         if not api_token_exists():
@@ -53,19 +47,17 @@ class TemperatureMonitor:
                 with open(self.device_info_file, "r") as f:
                     device_info = json.load(f)
             response = make_api_request_with_creds({
-                'email': self.config['email'],
-                'password': self.config['password'],
+                'email': self.config.config['email'],
+                'password': self.config.config['password'],
             }, 'sensors/configure', {**device_info, **{
-                'name': self.config['device_name'],
+                'name': self.config.config['device_name'],
                 'configured_at': datetime.utcnow().isoformat() + 'Z'
             }})
 
             if response.status_code == 401:
                 print('Deleting email and password and restarting in setup mode')
-                self.config['error'] = 'Email or password is incorrect. Please provide the email and password you use to login to the Freezerbot app.'
-                with open(self.config_file, 'w') as f:
-                    json.dump(self.config, f)
-                self.clear_creds_from_config()
+                self.config.add_config_error('Email or password is incorrect. Please provide the email and password you use to login to the Freezerbot app.')
+                self.config.clear_creds_from_config()
                 self.freezerbot_setup.restart_in_setup_mode()
             elif response.status_code != 201:
                 print(f'Error obtaining token: {response.status_code} {response.text}')
@@ -74,7 +66,7 @@ class TemperatureMonitor:
                 data = response.json()
                 if 'token' in data:
                     set_api_token(data['token'])
-                    self.clear_creds_from_config()
+                    self.config.clear_creds_from_config()
                 else:
                     print(f'No token in response: {data}')
                     self.led_control.set_state('error')

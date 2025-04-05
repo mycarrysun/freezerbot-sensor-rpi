@@ -2,21 +2,22 @@
 import os
 import subprocess
 
+from config import Config
+
 
 def determine_mode():
     """Determine which mode to start in based on configuration"""
-    config_file = "/home/pi/freezerbot/config.json"
-    is_configured = os.path.exists(config_file)
+    config = Config()
 
     # Ensure firmware updater is always enabled
     ensure_updater_is_active()
 
-    if is_configured:
-        # Start in monitor mode
+    if config.is_configured:
+        print('Configuration valid, starting freezerbot-monitor.service')
         subprocess.run(["sudo", "systemctl", "start", "freezerbot-monitor.service"])
         subprocess.run(["sudo", "systemctl", "stop", "freezerbot-setup.service"])
     else:
-        # Start in setup mode
+        print('Configuration invalid, starting freezerbot-setup.service')
         subprocess.run(["sudo", "systemctl", "start", "freezerbot-setup.service"])
         subprocess.run(["sudo", "systemctl", "stop", "freezerbot-monitor.service"])
 

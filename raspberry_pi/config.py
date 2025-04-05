@@ -1,0 +1,31 @@
+import os
+import json
+
+
+class Config:
+    def __init__(self):
+        self.config_file = "/home/pi/freezerbot/config.json"
+        self.configuration_exists = os.path.exists(self.config_file)
+        self.config = {}
+        if self.configuration_exists:
+            with open(self.config_file, "r") as f:
+                self.config = json.load(f)
+        self.is_configured = 'email' in self.config and 'password' in self.config
+
+    def clear_config(self):
+        if os.path.exists(self.config_file):
+            os.remove(self.config_file)
+
+    def save_new_config(self, new_config):
+        with open(self.config_file, "w") as f:
+            json.dump(new_config, f)
+        self.config = new_config
+
+    def clear_creds_from_config(self):
+        del self.config['email']
+        del self.config['password']
+        self.save_new_config(self.config)
+
+    def add_config_error(self, error):
+        self.config['error'] = error
+        self.save_new_config(self.config)
