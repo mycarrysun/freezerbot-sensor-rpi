@@ -2,6 +2,8 @@
 .vscode
 .env
 venv
+.venv
+__pycache__
 config.json
 logs
 backup
