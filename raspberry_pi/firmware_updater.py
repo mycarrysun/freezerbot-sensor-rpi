@@ -35,7 +35,7 @@ class FirmwareUpdater:
         """Set up all file and directory paths used by the updater"""
         self.base_directory = "/home/pi/freezerbot"
         self.config_file_path = os.path.join(self.base_directory, "config.json")
-        self.backup_directory = os.path.join(self.base_directory, "backup")
+        self.backup_directory = "/home/pi/freezerbot-backups"
         self.repository_url = "https://github.com/mycarrysun/freezerbot-sensor-rpi.git"
         self.system_directory = os.path.join(self.base_directory, "system")
 
