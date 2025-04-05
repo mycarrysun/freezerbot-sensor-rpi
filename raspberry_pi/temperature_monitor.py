@@ -19,7 +19,6 @@ class TemperatureMonitor:
         """Initialize the temperature monitoring application"""
         self.config = Config()
         self.device_info_file = "/home/pi/freezerbot/device_info.json"
-        self.network_failure_count = 0
         self.consecutive_errors = []
 
         self.led_control = LedControl()
@@ -139,7 +138,7 @@ class TemperatureMonitor:
 
             except Exception as e:
                 print(f"Error in main loop: {str(e)}")
-                self.consecutive_errors += 1
+                self.consecutive_errors.append(str(e))
                 self.led_control.set_state("error")
                 time.sleep(5)
 
