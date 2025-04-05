@@ -77,9 +77,31 @@ class FirmwareUpdater:
             self.logger.error(f"Failed to save update history: {traceback.format_exc()}")
 
     def add_error_to_update_attempt(self, error: str):
-        if 'errors' not in self.update_history['attempts'][-1]:
-            self.update_history['attempts'][-1]['errors'] = []
-        self.update_history['attempts'][-1]['errors'].append(error)
+        # Ensure attempts is a list and not empty
+        if not isinstance(self.update_history.get('attempts'), list) or not self.update_history['attempts']:
+            # Create an initial attempt entry if none exists
+            self.update_history['attempts'] = [{
+                "timestamp": datetime.now().timestamp(),
+                "failure_count": 0
+            }]
+            self.save_update_history()
+
+        # Now we can safely check and modify the last attempt
+        last_attempt = self.update_history['attempts'][-1]
+        if not isinstance(last_attempt, dict):
+            # Handle case where last attempt isn't a dictionary
+            last_attempt = {
+                "timestamp": datetime.now().timestamp(),
+                "failure_count": 0
+            }
+            self.update_history['attempts'][-1] = last_attempt
+
+        # Add the errors list if it doesn't exist
+        if 'errors' not in last_attempt:
+            last_attempt['errors'] = []
+
+        # Append the error and save
+        last_attempt['errors'].append(error)
         self.save_update_history()
 
     def ensure_backup_directory_exists(self):
