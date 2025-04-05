@@ -55,7 +55,7 @@ class FirmwareUpdater:
 
             # Copy the entire directory contents recursively
             self.logger.info(f"Backing up all files from {self.base_directory} to {backup_path}")
-            subprocess.run(["cp", "-r", f"{self.base_directory}/.", backup_path],
+            subprocess.run(["/usr/bin/cp", "-r", f"{self.base_directory}/.", backup_path],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
             return True, backup_path
@@ -108,12 +108,12 @@ class FirmwareUpdater:
 
             self.logger.info("Pulling latest changes")
             subprocess.run(["/usr/bin/git", "reset", "--hard", "origin/main"], check=True)
-            subprocess.run(["sudo", f"{self.base_directory}/install.sh"], check=True)
+            subprocess.run(["/usr/bin/sudo", f"{self.base_directory}/install.sh"], check=True)
 
             sleep(5)
 
-            monitor_status = subprocess.run(['systemctl', 'status', 'freezerbot-monitor.service'], capture_output=True, text=True, check=True)
-            setup_status = subprocess.run(['systemctl', 'status', 'freezerbot-setup.service'], capture_output=True, text=True, check=True)
+            monitor_status = subprocess.run(['/usr/bin/systemctl', 'status', 'freezerbot-monitor.service'], capture_output=True, text=True, check=True)
+            setup_status = subprocess.run(['/usr/bin/systemctl', 'status', 'freezerbot-setup.service'], capture_output=True, text=True, check=True)
 
             if 'active (running)' not in monitor_status or setup_status:
                 self.logger.error('Monitor or setup service is not running after applying updates. Rolling back.')
@@ -136,8 +136,8 @@ class FirmwareUpdater:
         try:
             self.logger.info(f"Rolling back to backup: {backup_path}")
 
-            subprocess.run(["mv", backup_path, self.base_directory], check=True)
-            subprocess.run(["sudo", f'{self.base_directory}/install.sh'], check=True)
+            subprocess.run(["/usr/bin/mv", backup_path, self.base_directory], check=True)
+            subprocess.run(["/usr/bin/sudo", f'{self.base_directory}/install.sh'], check=True)
 
             return True
         except Exception as error:
