@@ -3,12 +3,13 @@ import logging
 import os
 import subprocess
 import traceback
+import json
 from datetime import datetime
 from time import sleep
 
 
 class FirmwareUpdater:
-    """Handles automatic firmware updates for Freezerbot devices"""
+    """Handles automatic firmware updates for Freezerbot devices with recovery capability"""
 
     def __init__(self):
         self.initialize_paths()
@@ -16,7 +17,11 @@ class FirmwareUpdater:
         self.device_is_configured = os.path.exists(self.config_file_path)
         self.ensure_backup_directory_exists()
 
+        # Load update history
+        self.update_history = self.load_update_history()
+
         self.logger.info(f"Firmware updater initialized. Device configured: {self.device_is_configured}")
+        self.logger.info(f"Update attempt count: {len(self.update_history['attempts'])}")
 
     def setup_logging(self):
         """Configure logging for the updater service"""
@@ -37,6 +42,28 @@ class FirmwareUpdater:
         self.backup_directory = "/home/pi/freezerbot-backups"
         self.repository_url = "https://github.com/mycarrysun/freezerbot-sensor-rpi.git"
         self.system_directory = os.path.join(self.base_directory, "system")
+        self.update_history_path = "/home/pi/freezerbot-logs/update_history.json"
+
+    def load_update_history(self):
+        """Load history of update attempts"""
+        try:
+            if os.path.exists(self.update_history_path):
+                with open(self.update_history_path, 'r') as f:
+                    return json.load(f)
+            else:
+                return {"attempts": [], "last_success": 0}
+        except Exception as e:
+            self.logger.error(f"Failed to load update history: {traceback.format_exc()}")
+            return {"attempts": [], "last_success": 0}
+
+    def save_update_history(self):
+        """Save update history to file"""
+        try:
+            os.makedirs(os.path.dirname(self.update_history_path), exist_ok=True)
+            with open(self.update_history_path, 'w') as f:
+                json.dump(self.update_history, f)
+        except Exception as e:
+            self.logger.error(f"Failed to save update history: {traceback.format_exc()}")
 
     def ensure_backup_directory_exists(self):
         """Create backup directory if it doesn't exist"""
@@ -145,12 +172,24 @@ class FirmwareUpdater:
             return False
 
     def apply_update(self, backup_path):
-        """Download and apply firmware update"""
+        """Apply update with recovery strategies based on attempt count"""
         current_directory = os.getcwd()
+        failure_count = len(self.update_history["attempts"])
+        recovery_level = min(failure_count, 2)
+
+        # Record this attempt
+        self.update_history["attempts"].append({
+            "timestamp": datetime.now().timestamp(),
+            "recovery_level": recovery_level
+        })
+        self.save_update_history()
+
+        self.logger.info(f"Attempting update with recovery level {recovery_level}")
+
         try:
             os.chdir(self.base_directory)
 
-            # Pull latest changes
+            # Always reset to latest version
             self.logger.info("Pulling latest changes")
             self.run_command_with_logging(
                 ["/usr/bin/git", "reset", "--hard", "origin/main"],
@@ -164,33 +203,63 @@ class FirmwareUpdater:
                 log_prefix="Install"
             )
 
-            sleep(5)
+            # LEVEL 0: Standard update with full verification
+            if recovery_level < 2:
+                return self.verify_and_handle_rollback(backup_path, current_directory)
 
-            # Check service status
-            monitor_status = self.run_command_with_logging(
-                ["/usr/bin/sudo", "/usr/bin/systemctl", "status", "freezerbot-monitor.service"],
-                log_prefix="Monitor status",
-                check=False  # Don't raise exception on non-zero exit
-            )
+            # LEVEL 2: No rollback
+            else:  # recovery_level >= 2
+                self.logger.warning("Recovery Level 2: Skip verification and disable rollback")
+                # Consider it successful regardless of service status
+                self.clear_update_history()
+                return True
 
-            setup_status = self.run_command_with_logging(
-                ["/usr/bin/sudo", "/usr/bin/systemctl", "status", "freezerbot-setup.service"],
-                log_prefix="Setup status",
-                check=False  # Don't raise exception on non-zero exit
-            )
+        except Exception as error:
+            self.logger.error(f"Update failed with recovery level {recovery_level}: {traceback.format_exc()}")
 
-            # Check if either service is running
-            if 'active (running)' not in monitor_status.stdout and 'active (running)' not in setup_status.stdout:
-                self.logger.error('Neither monitor nor setup service is running after applying updates. Rolling back.')
+            # Only rollback for levels 0-1
+            if recovery_level < 2 and backup_path:
                 os.chdir(current_directory)
                 self.rollback_to_backup(backup_path)
-                return False
-            return True
-        except Exception as error:
-            self.logger.error(f"Rolling back because the update failed: \n\n{traceback.format_exc()}")
+
+            return False
+
+    def verify_and_handle_rollback(self, backup_path, current_directory):
+        """Level 0: Full verification with rollback"""
+        sleep(5)  # give services time to start or crash
+
+        # Check service status
+        monitor_status = self.run_command_with_logging(
+            ["/usr/bin/sudo", "/usr/bin/systemctl", "status", "freezerbot-monitor.service"],
+            log_prefix="Monitor status",
+            check=False  # Don't raise exception on non-zero exit
+        )
+
+        setup_status = self.run_command_with_logging(
+            ["/usr/bin/sudo", "/usr/bin/systemctl", "status", "freezerbot-setup.service"],
+            log_prefix="Setup status",
+            check=False  # Don't raise exception on non-zero exit
+        )
+
+        # Check if either service is running
+        if 'active (running)' not in monitor_status.stdout and 'active (running)' not in setup_status.stdout:
+            self.logger.error('Neither monitor nor setup service is running after applying updates. Rolling back.')
             os.chdir(current_directory)
             self.rollback_to_backup(backup_path)
             return False
+
+        # Success - clear history
+        self.clear_update_history()
+        return True
+
+    def clear_update_history(self):
+        """Clear update history on successful update"""
+        self.update_history = {
+            "attempts": [],
+            "last_success": datetime.now().timestamp()
+        }
+        self.save_update_history()
+        self.logger.info("Update successful - history cleared")
 
     def rollback_to_backup(self, backup_path):
         """Restore previous version if update failed"""
@@ -222,17 +291,23 @@ class FirmwareUpdater:
             return False
 
     def run(self):
-        """Main entry point for the updater service"""
+        """Main entry point for the updater service with tiered recovery"""
         self.logger.info("Starting firmware update check")
 
         if not self.updates_are_available():
             self.logger.info("No updates available or error checking. Exiting.")
             return
 
-        backup_path = self.create_timestamped_backup()
-        if not backup_path:
-            self.logger.error("Backup failed. Aborting update for safety.")
-            return
+        # Determine if we should create a backup based on recovery level
+        failure_count = len(self.update_history["attempts"])
+        if failure_count < 2:  # Only create backups for levels 0-1
+            backup_path = self.create_timestamped_backup()
+            if not backup_path and failure_count < 2:  # Skip backup check for level 2+
+                self.logger.error("Backup failed. Aborting update for safety.")
+                return
+        else:
+            self.logger.warning("Recovery level 2+: Skipping backup creation")
+            backup_path = None
 
         success = self.apply_update(backup_path)
 
