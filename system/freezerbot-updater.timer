@@ -2,15 +2,13 @@
 Description=Run Freezerbot firmware updater nightly at 3am
 
 [Timer]
-# TODO put this back when done testing
-# OnCalendar=*-*-* 03:00:00
-# or maybe this for more frequent updates
-# OnBootSec=60
-# OnUnitActiveSec=5m
-# AccuracySec=1s
-OnActiveSec=1m
-OnUnitActiveSec=1m
-AccuracySec=1s
+# Run every night at 3am
+OnCalendar=*-*-* 03:00:00
+# Randomize start time within a 10-minute window to avoid exact timing collisions
+RandomizedDelaySec=600s
+# Set how accurately systemd should try to hit the scheduled time
+AccuracySec=1m
+# Remember last trigger time across reboots
 Persistent=true
 
 [Install]
