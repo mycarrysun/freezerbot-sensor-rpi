@@ -113,7 +113,7 @@ class FirmwareUpdater:
             monitor_status = subprocess.run(["/usr/bin/sudo", '/usr/bin/systemctl', 'status', 'freezerbot-monitor.service'], capture_output=True, text=True)
             setup_status = subprocess.run(["/usr/bin/sudo", '/usr/bin/systemctl', 'status', 'freezerbot-setup.service'], capture_output=True, text=True)
 
-            if 'active (running)' not in monitor_status or setup_status:
+            if 'active (running)' not in monitor_status.stdout and 'active (running)' not in setup_status.stdout:
                 self.logger.error('Monitor or setup service is not running after applying updates. Rolling back.')
                 os.chdir(current_directory)
                 self.rollback_to_backup(backup_path)
