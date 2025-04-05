@@ -1,6 +1,7 @@
 [Unit]
 Description=Freezerbot Firmware Updater
 After=network.target
+StartLimitIntervalSec=10
 
 [Service]
 Type=oneshot

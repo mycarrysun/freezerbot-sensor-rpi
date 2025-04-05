@@ -179,9 +179,6 @@ class FirmwareUpdater:
                 check=False  # Don't raise exception on non-zero exit
             )
 
-            # TODO remove before actually using on real devices
-            raise Exception('test exception')
-
             # Check if either service is running
             if 'active (running)' not in monitor_status.stdout and 'active (running)' not in setup_status.stdout:
                 self.logger.error('Neither monitor nor setup service is running after applying updates. Rolling back.')
