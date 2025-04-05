@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 import logging
 import os
-import subprocess
 import traceback
 from datetime import datetime
 from time import sleep
+import sh
+from sh import ErrorReturnCode
 
 
 class FirmwareUpdater:
     """Handles automatic firmware updates for Freezerbot devices"""
 
     def __init__(self):
-
         self.initialize_paths()
         self.setup_logging()
         self.device_is_configured = os.path.exists(self.config_file_path)
@@ -54,10 +54,15 @@ class FirmwareUpdater:
 
         # Copy the entire directory contents recursively
         self.logger.info(f"Backing up all files from {self.base_directory} to {backup_path}")
-        subprocess.run(["/usr/bin/sudo", "/usr/bin/cp", "-r", f"{self.base_directory}/.", backup_path],
-                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-
-        return backup_path
+        try:
+            # Configure sudo cp command with logging
+            sudo_cp = sh.sudo.bake("cp", _err_to_out=True,
+                                   _out=lambda line: self.logger.info(f"Backup: {line.strip()}"))
+            sudo_cp("-r", f"{self.base_directory}/.", backup_path)
+            return backup_path
+        except ErrorReturnCode as e:
+            self.logger.error(f"Backup failed with exit code {e.exit_code}")
+            return None
 
     def updates_are_available(self):
         """Check if firmware updates are available from the repository"""
@@ -67,15 +72,21 @@ class FirmwareUpdater:
         try:
             os.chdir(self.base_directory)
 
+            # Configure git command with logging
+            git = sh.git.bake(_err_to_out=True, _out=lambda line: self.logger.info(f"Git: {line.strip()}"))
+
+            # Add repo to safe directory
+            try:
+                git.config("--global", "--add", "safe.directory", self.base_directory)
+            except ErrorReturnCode:
+                self.logger.warning("Failed to add repo to safe.directory, continuing anyway")
+
             # Fetch latest changes
-            subprocess.run(["/usr/bin/git", "fetch", "origin"],
-                           capture_output=True, text=True, check=True)
+            git.fetch("origin")
 
             # Get current and remote commit hashes
-            current_commit = subprocess.run(["/usr/bin/git", "rev-parse", "HEAD"],
-                                            capture_output=True, text=True, check=True).stdout.strip()
-            remote_commit = subprocess.run(["/usr/bin/git", "rev-parse", "origin/main"],
-                                           capture_output=True, text=True, check=True).stdout.strip()
+            current_commit = git("rev-parse", "HEAD").strip()
+            remote_commit = git("rev-parse", "origin/main").strip()
 
             os.chdir(current_directory)
 
@@ -86,9 +97,8 @@ class FirmwareUpdater:
                 self.logger.info("No updates available")
 
             return has_updates
-        except subprocess.CalledProcessError as error:
-            self.logger.error(f"Git command failed: {error.cmd} (exit code {error.returncode})")
-            self.logger.error(f"Error output: {error.stderr}")
+        except ErrorReturnCode as e:
+            self.logger.error(f"Git command failed with exit code {e.exit_code}")
             os.chdir(current_directory)
             return False
         except Exception as error:
@@ -102,18 +112,38 @@ class FirmwareUpdater:
         try:
             os.chdir(self.base_directory)
 
+            # Configure git and sudo commands with logging
+            git = sh.git.bake(_err_to_out=True, _out=lambda line: self.logger.info(f"Git update: {line.strip()}"))
+            sudo = sh.sudo.bake(_err_to_out=True, _out=lambda line: self.logger.info(f"Install: {line.strip()}"))
+
+            # Pull latest changes
             self.logger.info("Pulling latest changes")
-            subprocess.run(["/usr/bin/git", "reset", "--hard", "origin/main"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            git.reset("--hard", "origin/main")
+
+            # Run install script
             self.logger.info('Running install script after pulling new changes')
-            subprocess.run(["/usr/bin/sudo", f"{self.base_directory}/install.sh"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            sudo(f"{self.base_directory}/install.sh")
 
             sleep(5)
 
-            # don't set check=True on these commands because one of them will return exit code 3 for disabled
-            monitor_status = subprocess.run(["/usr/bin/sudo", '/usr/bin/systemctl', 'status', 'freezerbot-monitor.service'], capture_output=True, text=True)
-            setup_status = subprocess.run(["/usr/bin/sudo", '/usr/bin/systemctl', 'status', 'freezerbot-setup.service'], capture_output=True, text=True)
+            # Check service status
+            sudo_systemctl = sh.sudo.bake("systemctl", _err_to_out=False)
+            try:
+                monitor_status = sudo_systemctl("status", "freezerbot-monitor.service", _ok_code=[0, 3])
+                self.logger.info(f"Monitor status: {monitor_status}")
+            except ErrorReturnCode as e:
+                monitor_status = e.stdout
+                self.logger.warning(f"Monitor status check returned non-zero: {e.exit_code}")
 
-            if 'active (running)' not in monitor_status.stdout and 'active (running)' not in setup_status.stdout:
+            try:
+                setup_status = sudo_systemctl("status", "freezerbot-setup.service", _ok_code=[0, 3])
+                self.logger.info(f"Setup status: {setup_status}")
+            except ErrorReturnCode as e:
+                setup_status = e.stdout
+                self.logger.warning(f"Setup status check returned non-zero: {e.exit_code}")
+
+            # Check if either service is running
+            if 'active (running)' not in str(monitor_status) and 'active (running)' not in str(setup_status):
                 self.logger.error('Monitor or setup service is not running after applying updates. Rolling back.')
                 os.chdir(current_directory)
                 self.rollback_to_backup(backup_path)
@@ -134,12 +164,19 @@ class FirmwareUpdater:
         try:
             self.logger.info(f"Rolling back to backup: {backup_path}")
 
-            subprocess.run(["/usr/bin/sudo", "/usr/bin/mv", "-T", backup_path, self.base_directory], check=True)
+            # Configure sudo commands with logging
+            sudo = sh.sudo.bake(_err_to_out=True, _out=lambda line: self.logger.info(f"Rollback: {line.strip()}"))
+
+            # Move backup to base directory
+            sudo("mv", "-T", backup_path, self.base_directory)
 
             self.logger.info('Running install script after rollback')
-            subprocess.run(["/usr/bin/sudo", f'{self.base_directory}/install.sh'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            sudo(f"{self.base_directory}/install.sh")
 
             return True
+        except ErrorReturnCode as e:
+            self.logger.error(f"Rollback failed with exit code {e.exit_code}")
+            return False
         except Exception as error:
             self.logger.error(f"Rollback failed: {str(error)}")
             return False
