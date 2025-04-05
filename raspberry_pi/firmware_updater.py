@@ -365,17 +365,22 @@ class FirmwareUpdater:
         else:
             self.logger.error('Firmware update failed')
             if self.config.is_configured and len(self.update_history['attempts']) > 0:
+                self.logger.info('Trying to send errors to api')
                 if not api_token_exists():
+                    self.logger.info('Obtaining new api token')
                     TemperatureMonitor().obtain_api_token()
                 errors = []
                 if 'errors' in self.update_history['attempts'][-1]:
                     errors = self.update_history['attempts'][-1]['errors']
-                make_api_request('sensors/errors', json={
+                self.logger.info(f'Sending api request with:\n'+'\n'.join(errors))
+                response = make_api_request('sensors/errors', json={
                     'errors': [
                         'Errors updating firmware',
                         *errors
                     ]
                 })
+                if response.status_code != 200:
+                    self.logger.error(f'Error sending api request: {response.status_code} - {response.status_text}')
 
 
 if __name__ == "__main__":
