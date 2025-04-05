@@ -54,7 +54,7 @@ class FirmwareUpdater:
 
         # Copy the entire directory contents recursively
         self.logger.info(f"Backing up all files from {self.base_directory} to {backup_path}")
-        subprocess.run(["/usr/bin/sudo", "/usr/bin/cp", "-r", f"{self.base_directory}/", backup_path],
+        subprocess.run(["/usr/bin/sudo", "/usr/bin/cp", "-r", f"{self.base_directory}/.", backup_path],
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
         return backup_path
@@ -103,8 +103,9 @@ class FirmwareUpdater:
             os.chdir(self.base_directory)
 
             self.logger.info("Pulling latest changes")
-            subprocess.run(["/usr/bin/git", "reset", "--hard", "origin/main"], check=True)
-            subprocess.run(["/usr/bin/sudo", f"{self.base_directory}/install.sh"], check=True)
+            subprocess.run(["/usr/bin/git", "reset", "--hard", "origin/main"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self.logger.info('Running install script after pulling new changes')
+            subprocess.run(["/usr/bin/sudo", f"{self.base_directory}/install.sh"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
             sleep(5)
 
@@ -133,7 +134,9 @@ class FirmwareUpdater:
             self.logger.info(f"Rolling back to backup: {backup_path}")
 
             subprocess.run(["/usr/bin/sudo", "/usr/bin/mv", backup_path, self.base_directory], check=True)
-            subprocess.run(["/usr/bin/sudo", f'{self.base_directory}/install.sh'], check=True)
+
+            self.logger.info('Running install script after rollback')
+            subprocess.run(["/usr/bin/sudo", f'{self.base_directory}/install.sh'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
             return True
         except Exception as error:
