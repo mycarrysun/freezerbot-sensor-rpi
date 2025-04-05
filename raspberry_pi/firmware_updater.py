@@ -72,11 +72,11 @@ class FirmwareUpdater:
             os.chdir(self.base_directory)
 
             # Fetch latest changes
-            subprocess.run(["git", "fetch", "origin"])
+            subprocess.run(["/usr/bin/git", "fetch", "origin"])
 
             # Get current and remote commit hashes
-            current_commit = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
-            remote_commit = subprocess.check_output(["git", "rev-parse", "origin/main"]).decode().strip()
+            current_commit = subprocess.check_output(["/usr/bin/git", "rev-parse", "HEAD"]).decode().strip()
+            remote_commit = subprocess.check_output(["/usr/bin/git", "rev-parse", "origin/main"]).decode().strip()
 
             os.chdir(current_directory)
 
@@ -99,7 +99,7 @@ class FirmwareUpdater:
             os.chdir(self.base_directory)
 
             self.logger.info("Pulling latest changes")
-            subprocess.run(["git", "reset", "--hard", "origin/main"])
+            subprocess.run(["/usr/bin/git", "reset", "--hard", "origin/main"])
             subprocess.run(["sudo", f"{self.base_directory}/install.sh"])
 
             sleep(5)
