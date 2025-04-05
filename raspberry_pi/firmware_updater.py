@@ -153,9 +153,12 @@ class FirmwareUpdater:
             self.logger.error("Backup failed. Aborting update for safety.")
             return
 
-        self.apply_update(backup_path)
+        success = self.apply_update(backup_path)
 
-        self.logger.info("Firmware update completed successfully")
+        if success:
+            self.logger.info("Firmware update completed successfully")
+        else:
+            self.logger.error('Firmware update failed')
 
 
 if __name__ == "__main__":
