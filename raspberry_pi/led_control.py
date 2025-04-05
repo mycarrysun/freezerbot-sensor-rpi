@@ -19,6 +19,7 @@ class LedControl:
 
         self.BUTTON_PIN = 17
         self.LED_PIN = 27
+        self.pattern_thread = None
         self.pwm = None
         self.setup()
 
@@ -113,6 +114,7 @@ class LedControl:
             self.pwm.stop()
             self.pwm = None
 
+        self.running = True
         self.pattern_thread = threading.Thread(target=pattern_function)
         self.pattern_thread.daemon = True
         self.pattern_thread.start()

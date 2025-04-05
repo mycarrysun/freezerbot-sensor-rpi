@@ -48,7 +48,7 @@ class TemperatureMonitor:
             response = make_api_request_with_creds({
                 'email': self.config.config['email'],
                 'password': self.config.config['password'],
-            }, 'sensors/configure', {**device_info, **{
+            }, 'sensors/configure', json={**device_info, **{
                 'name': self.config.config['device_name'],
                 'configured_at': datetime.utcnow().isoformat() + 'Z'
             }})
