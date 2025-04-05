@@ -119,7 +119,7 @@ class TemperatureMonitor:
                     payload = {
                         "degrees_c": temperature,
                         "cpu_degrees_c": CPUTemperature().temperature,
-                        "timestamp": datetime.utcnow().isoformat() + 'Z'
+                        "taken_at": datetime.utcnow().isoformat() + 'Z'
                     }
 
                     response = make_api_request('sensors/readings', json=payload)
