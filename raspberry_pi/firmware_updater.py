@@ -2,15 +2,18 @@
 import logging
 import os
 import subprocess
+import traceback
 from datetime import datetime
+from time import sleep
 
 
 class FirmwareUpdater:
     """Handles automatic firmware updates for Freezerbot devices"""
 
     def __init__(self):
-        self.setup_logging()
+
         self.initialize_paths()
+        self.setup_logging()
         self.device_is_configured = os.path.exists(self.config_file_path)
         self.ensure_backup_directory_exists()
 
@@ -18,7 +21,7 @@ class FirmwareUpdater:
 
     def setup_logging(self):
         """Configure logging for the updater service"""
-        log_file_path = "/var/log/freezerbot-updater.log"
+        log_file_path = f"{self.base_directory}/logs/freezerbot-updater.log"
         logging_format = '%(asctime)s - %(levelname)s - %(message)s'
 
         logging.basicConfig(
@@ -62,41 +65,7 @@ class FirmwareUpdater:
 
     def updates_are_available(self):
         """Check if firmware updates are available from the repository"""
-        try:
-            git_directory = os.path.join(self.base_directory, ".git")
-
-            if not os.path.exists(git_directory):
-                return self.initialize_git_repository()
-
-            return self.check_git_for_updates()
-        except Exception as error:
-            self.logger.error(f"Error checking for updates: {str(error)}")
-            return False
-
-    def initialize_git_repository(self):
-        """Set up git repository for first-time use"""
-        self.logger.info("Git repository not found. Setting up new repository.")
-        current_directory = os.getcwd()
-
-        try:
-            os.chdir(self.base_directory)
-
-            # Initialize git and set up remote
-            subprocess.run(["git", "init"])
-            subprocess.run(["git", "remote", "add", "origin", self.repository_url])
-            subprocess.run(["git", "fetch"])
-            subprocess.run(["git", "checkout", "-f", "main"])  # or your default branch
-
-            os.chdir(current_directory)
-            return True
-        except Exception as error:
-            self.logger.error(f"Failed to initialize git repository: {str(error)}")
-            os.chdir(current_directory)
-            return False
-
-    def check_git_for_updates(self):
-        """Compare local and remote git repositories for changes"""
-        self.logger.info("Checking for updates")
+        self.logger.info("Checking for updates from git")
         current_directory = os.getcwd()
 
         try:
@@ -123,59 +92,31 @@ class FirmwareUpdater:
             os.chdir(current_directory)
             return False
 
-    def apply_update(self):
+    def apply_update(self, backup_path):
         """Download and apply firmware update"""
+        current_directory = os.getcwd()
         try:
-            current_directory = os.getcwd()
             os.chdir(self.base_directory)
 
             self.logger.info("Pulling latest changes")
-            subprocess.run(["git", "pull", "origin", "main"])
+            subprocess.run(["git", "reset", "--hard", "origin/main"])
+            subprocess.run(["sudo", f"{self.base_directory}/install.sh"])
 
-            self.install_dependencies()
-            self.update_system_services()
+            sleep(5)
 
-            os.chdir(current_directory)
+            monitor_status = subprocess.run(['systemctl', 'status', 'freezerbot-monitor.service'], capture_output=True, text=True)
+            setup_status = subprocess.run(['systemctl', 'status', 'freezerbot-setup.service'], capture_output=True, text=True)
+
+            if 'active (running)' not in monitor_status or setup_status:
+                self.logger.error('Monitor or setup service is not running after applying updates. Rolling back.')
+                os.chdir(current_directory)
+                self.rollback_to_backup(backup_path)
+                return False
             return True
         except Exception as error:
-            self.logger.error(f"Update failed: {str(error)}")
+            self.logger.error(f"Rolling back because the update failed: \n\n{traceback.format_exc()}")
             os.chdir(current_directory)
-            return False
-
-    def install_dependencies(self):
-        """Install any new dependencies from requirements.txt"""
-        requirements_file = os.path.join(self.base_directory, "requirements.txt")
-        if os.path.exists(requirements_file):
-            self.logger.info("Installing dependencies")
-            subprocess.run(["pip3", "install", "-r", requirements_file])
-
-    def update_system_services(self):
-        """Update systemd service files if there are changes"""
-        if os.path.exists(self.system_directory):
-            self.logger.info("Updating system services")
-
-            for file in os.listdir(self.system_directory):
-                if file.endswith('.service') or file.endswith('.timer'):
-                    source_path = os.path.join(self.system_directory, file)
-                    destination_path = f"/etc/systemd/system/{file}"
-                    subprocess.run(["cp", source_path, destination_path])
-
-            # Reload systemd to recognize changes
-            subprocess.run(["systemctl", "daemon-reload"])
-
-    def restart_appropriate_service(self):
-        """Restart the service based on device's current mode"""
-        try:
-            if self.device_is_configured:
-                self.logger.info("Restarting monitoring service")
-                subprocess.run(["systemctl", "restart", "freezerbot-monitor.service"])
-            else:
-                self.logger.info("Restarting setup service")
-                subprocess.run(["systemctl", "restart", "freezerbot-setup.service"])
-
-            return True
-        except Exception as error:
-            self.logger.error(f"Service restart failed: {str(error)}")
+            self.rollback_to_backup(backup_path)
             return False
 
     def rollback_to_backup(self, backup_path):
@@ -187,42 +128,12 @@ class FirmwareUpdater:
         try:
             self.logger.info(f"Rolling back to backup: {backup_path}")
 
-            self.restore_main_files(backup_path)
-            self.restore_system_files(backup_path)
+            subprocess.run(["mv", backup_path, self.base_directory])
 
             return True
         except Exception as error:
             self.logger.error(f"Rollback failed: {str(error)}")
             return False
-
-    def restore_main_files(self, backup_path):
-        """Restore main directory files from backup"""
-        for file in os.listdir(backup_path):
-            if file == "system":
-                continue
-
-            source_path = os.path.join(backup_path, file)
-            destination_path = os.path.join(self.base_directory, file)
-            subprocess.run(["cp", source_path, destination_path])
-
-    def restore_system_files(self, backup_path):
-        """Restore system service files from backup"""
-        system_backup_path = os.path.join(backup_path, "system")
-        if os.path.exists(system_backup_path):
-            for file in os.listdir(system_backup_path):
-                source_path = os.path.join(system_backup_path, file)
-
-                # Restore to project directory
-                project_destination = os.path.join(self.base_directory, "system", file)
-                subprocess.run(["cp", source_path, project_destination])
-
-                # Also update systemd files
-                if file.endswith('.service') or file.endswith('.timer'):
-                    system_destination = f"/etc/systemd/system/{file}"
-                    subprocess.run(["cp", source_path, system_destination])
-
-            # Reload systemd
-            subprocess.run(["systemctl", "daemon-reload"])
 
     def run(self):
         """Main entry point for the updater service"""
@@ -237,17 +148,7 @@ class FirmwareUpdater:
             self.logger.error("Backup failed. Aborting update for safety.")
             return
 
-        update_success = self.apply_update()
-        if not update_success:
-            self.logger.error("Update failed. Rolling back.")
-            self.rollback_to_backup(backup_path)
-            return
-
-        restart_success = self.restart_appropriate_service()
-        if not restart_success:
-            self.logger.error("Service restart failed. Rolling back.")
-            self.rollback_to_backup(backup_path)
-            return
+        self.apply_update(backup_path)
 
         self.logger.info("Firmware update completed successfully")
 

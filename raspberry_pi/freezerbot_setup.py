@@ -43,8 +43,6 @@ class FreezerBotSetup:
 
         subprocess.run(["/usr/bin/systemctl", "enable", "freezerbot-monitor.service"])
         subprocess.run(["/usr/bin/systemctl", "disable", "freezerbot-setup.service"])
-        sleep(10)
-        subprocess.run(["/usr/sbin/reboot"], shell=True)
 
     def setup_routes(self):
         """Set up the web routes for the configuration portal"""

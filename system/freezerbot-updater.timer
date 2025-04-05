@@ -2,7 +2,15 @@
 Description=Run Freezerbot firmware updater nightly at 3am
 
 [Timer]
-OnCalendar=*-*-* 03:00:00
+# TODO put this back when done testing
+# OnCalendar=*-*-* 03:00:00
+# or maybe this for more frequent updates
+# OnBootSec=60
+# OnUnitActiveSec=5m
+# AccuracySec=1s
+OnActiveSec=1s
+OnUnitActiveSec=1s
+AccuracySec=1s
 Persistent=true
 
 [Install]

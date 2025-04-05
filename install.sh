@@ -72,15 +72,7 @@ chmod 644 /etc/systemd/system/freezerbot-updater.service
 chmod 644 /etc/systemd/system/freezerbot-updater.timer
 
 # Enable services
-echo "Enabling systemd services..."
 systemctl daemon-reload
-systemctl enable freezerbot-setup.service
-systemctl enable freezerbot-updater.timer
-systemctl start freezerbot-updater.timer
+$FREEZERBOT_DIR/.venv/bin/python $FREEZERBOT_DIR/raspberry_pi/start.py
 
-# Set up startup script to run at boot
-echo "Setting up startup script..."
-echo "@reboot $FREEZERBOT_DIR/.venv/bin/python $FREEZERBOT_DIR/start.py >> $FREEZERBOT_DIR/logs/start.log" | crontab -u pi -
-
-echo "Installation complete! Reboot to start in setup mode."
-echo "Run 'sudo reboot' to start the Freezerbot setup process."
+echo "Installation complete! Freezerbot is now running."

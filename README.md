@@ -3,12 +3,14 @@
 ## Hardware Wiring
 
 Components:
-- Raspberry Pi Zero W
-- Momentary push button with built-in LED (waterproof, 12mm)
+- Raspberry Pi Zero W/2W
+- Momentary push button with built-in LED (waterproof, 12mm, 3-6V)
 - Temperature sensor (DS18B20 or similar)
 - Case with button mounting hole
 
 GPIO Connections:
+![](./docs/gpio-pinout.png)
+
 1. Button with Built-in LED (typically has 4 pins):
    - LED Positive (+) → GPIO 27 (pin 13)
    - LED Negative (-) → GND (pin 20)
@@ -16,9 +18,9 @@ GPIO Connections:
    - Second NO terminal → GND (pin 14)
 
 2. Temperature Sensor (DS18B20):
-   - Connect VCC to 3.3V (pin 1)
-   - Connect GND to GND (pin 9)
-   - Connect DATA to GPIO 4 (pin 7)
+   - Connect VCC to 3.3V (pin 17)
+   - Connect GND to GND (pin 25)
+   - Connect DATA to GPIO 4 (pin 23)
    - Connect a 4.7k pull-up resistor between DATA and VCC
 
 Installation:
