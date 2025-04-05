@@ -8,8 +8,8 @@ Description=Run Freezerbot firmware updater nightly at 3am
 # OnBootSec=60
 # OnUnitActiveSec=5m
 # AccuracySec=1s
-OnActiveSec=1s
-OnUnitActiveSec=1s
+OnActiveSec=1m
+OnUnitActiveSec=1m
 AccuracySec=1s
 Persistent=true
 

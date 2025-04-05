@@ -129,6 +129,7 @@ class FirmwareUpdater:
             self.logger.info(f"Rolling back to backup: {backup_path}")
 
             subprocess.run(["mv", backup_path, self.base_directory])
+            subprocess.run(["sudo", f'{self.base_directory}/install.sh'])
 
             return True
         except Exception as error:
