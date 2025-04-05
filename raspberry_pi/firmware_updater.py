@@ -46,22 +46,18 @@ class FirmwareUpdater:
 
     def create_timestamped_backup(self):
         """Back up current installation before applying updates"""
-        try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = os.path.join(self.backup_directory, f"backup_{timestamp}")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = os.path.join(self.backup_directory, f"backup_{timestamp}")
 
-            self.logger.info(f"Creating backup at {backup_path}")
-            os.makedirs(backup_path, exist_ok=True)
+        self.logger.info(f"Creating backup at {backup_path}")
+        os.makedirs(backup_path, exist_ok=True)
 
-            # Copy the entire directory contents recursively
-            self.logger.info(f"Backing up all files from {self.base_directory} to {backup_path}")
-            subprocess.run(["/usr/bin/sudo", "/usr/bin/cp", "-r", f"{self.base_directory}/.", backup_path],
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        # Copy the entire directory contents recursively
+        self.logger.info(f"Backing up all files from {self.base_directory} to {backup_path}")
+        subprocess.run(["/usr/bin/sudo", "/usr/bin/cp", "-r", f"{self.base_directory}/", backup_path],
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
-            return True, backup_path
-        except Exception as error:
-            self.logger.error(f"Backup failed: {str(error)}")
-            return False, None
+        return backup_path
 
     def updates_are_available(self):
         """Check if firmware updates are available from the repository"""
@@ -152,8 +148,8 @@ class FirmwareUpdater:
             self.logger.info("No updates available or error checking. Exiting.")
             return
 
-        backup_success, backup_path = self.create_timestamped_backup()
-        if not backup_success:
+        backup_path = self.create_timestamped_backup()
+        if not backup_path:
             self.logger.error("Backup failed. Aborting update for safety.")
             return
 
