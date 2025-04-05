@@ -1,11 +1,12 @@
-import os
-import time
 import subprocess
-import json
+import time
+from time import sleep
+
 import RPi.GPIO as GPIO
 from flask import Flask, request, render_template, redirect, jsonify
-from led_control import LedControl
+
 from config import Config
+from led_control import LedControl
 
 
 class FreezerBotSetup:
@@ -42,7 +43,8 @@ class FreezerBotSetup:
 
         subprocess.run(["/usr/bin/systemctl", "enable", "freezerbot-monitor.service"])
         subprocess.run(["/usr/bin/systemctl", "disable", "freezerbot-setup.service"])
-        subprocess.run(["/usr/bin/sleep", "10", "&&", "/usr/sbin/reboot"], shell=True)
+        sleep(10)
+        subprocess.run(["/usr/sbin/reboot"], shell=True)
 
     def setup_routes(self):
         """Set up the web routes for the configuration portal"""
@@ -228,8 +230,7 @@ class FreezerBotSetup:
                     "ssid", ssid,
                     "wifi-sec.key-mgmt", "wpa-psk",
                     "wifi-sec.psk", password,
-                    "autoconnect", "yes",
-                    "autoconnect-priority", str(priority + 10)  # Add 10 to ensure positive values
+                    "autoconnect", "yes"
                 ])
 
             # Enable all advanced connection settings for better reliability
