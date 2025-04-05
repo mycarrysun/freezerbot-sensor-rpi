@@ -75,12 +75,6 @@ class FirmwareUpdater:
             # Configure git command with logging
             git = sh.git.bake(_err_to_out=True, _out=lambda line: self.logger.info(f"Git: {line.strip()}"))
 
-            # Add repo to safe directory
-            try:
-                git.config("--global", "--add", "safe.directory", self.base_directory)
-            except ErrorReturnCode:
-                self.logger.warning("Failed to add repo to safe.directory, continuing anyway")
-
             # Fetch latest changes
             git.fetch("origin")
 
@@ -98,11 +92,11 @@ class FirmwareUpdater:
 
             return has_updates
         except ErrorReturnCode as e:
-            self.logger.error(f"Git command failed with exit code {e.exit_code}")
+            self.logger.error(f"Git command failed: {traceback.format_exc()}")
             os.chdir(current_directory)
             return False
         except Exception as error:
-            self.logger.error(f"Failed to check for updates: {str(error)}")
+            self.logger.error(f"Failed to check for updates: {traceback.format_exc()}")
             os.chdir(current_directory)
             return False
 
@@ -133,14 +127,14 @@ class FirmwareUpdater:
                 self.logger.info(f"Monitor status: {monitor_status}")
             except ErrorReturnCode as e:
                 monitor_status = e.stdout
-                self.logger.warning(f"Monitor status check returned non-zero: {e.exit_code}")
+                self.logger.warning(f"Monitor status check returned non-zero: {traceback.format_exc()}")
 
             try:
                 setup_status = sudo_systemctl("status", "freezerbot-setup.service", _ok_code=[0, 3])
                 self.logger.info(f"Setup status: {setup_status}")
             except ErrorReturnCode as e:
                 setup_status = e.stdout
-                self.logger.warning(f"Setup status check returned non-zero: {e.exit_code}")
+                self.logger.warning(f"Setup status check returned non-zero: {traceback.format_exc()}")
 
             # Check if either service is running
             if 'active (running)' not in str(monitor_status) and 'active (running)' not in str(setup_status):
@@ -175,10 +169,10 @@ class FirmwareUpdater:
 
             return True
         except ErrorReturnCode as e:
-            self.logger.error(f"Rollback failed with exit code {e.exit_code}")
+            self.logger.error(f"Rollback failed with exit code {traceback.format_exc()}")
             return False
         except Exception as error:
-            self.logger.error(f"Rollback failed: {str(error)}")
+            self.logger.error(f"Rollback failed: {traceback.format_exc()}")
             return False
 
     def run(self):
