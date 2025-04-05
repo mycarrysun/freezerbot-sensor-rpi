@@ -56,7 +56,7 @@ class FirmwareUpdater:
             # Copy the entire directory contents recursively
             self.logger.info(f"Backing up all files from {self.base_directory} to {backup_path}")
             subprocess.run(["cp", "-r", f"{self.base_directory}/.", backup_path],
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
             return True, backup_path
         except Exception as error:
@@ -72,11 +72,14 @@ class FirmwareUpdater:
             os.chdir(self.base_directory)
 
             # Fetch latest changes
-            subprocess.run(["/usr/bin/git", "fetch", "origin"])
+            subprocess.run(["/usr/bin/git", "fetch", "origin"],
+                           capture_output=True, text=True, check=True)
 
             # Get current and remote commit hashes
-            current_commit = subprocess.check_output(["/usr/bin/git", "rev-parse", "HEAD"]).decode().strip()
-            remote_commit = subprocess.check_output(["/usr/bin/git", "rev-parse", "origin/main"]).decode().strip()
+            current_commit = subprocess.run(["/usr/bin/git", "rev-parse", "HEAD"],
+                                            capture_output=True, text=True, check=True).stdout.strip()
+            remote_commit = subprocess.run(["/usr/bin/git", "rev-parse", "origin/main"],
+                                           capture_output=True, text=True, check=True).stdout.strip()
 
             os.chdir(current_directory)
 
@@ -87,6 +90,11 @@ class FirmwareUpdater:
                 self.logger.info("No updates available")
 
             return has_updates
+        except subprocess.CalledProcessError as error:
+            self.logger.error(f"Git command failed: {error.cmd} (exit code {error.returncode})")
+            self.logger.error(f"Error output: {error.stderr}")
+            os.chdir(current_directory)
+            return False
         except Exception as error:
             self.logger.error(f"Failed to check for updates: {str(error)}")
             os.chdir(current_directory)
@@ -99,13 +107,13 @@ class FirmwareUpdater:
             os.chdir(self.base_directory)
 
             self.logger.info("Pulling latest changes")
-            subprocess.run(["/usr/bin/git", "reset", "--hard", "origin/main"])
-            subprocess.run(["sudo", f"{self.base_directory}/install.sh"])
+            subprocess.run(["/usr/bin/git", "reset", "--hard", "origin/main"], check=True)
+            subprocess.run(["sudo", f"{self.base_directory}/install.sh"], check=True)
 
             sleep(5)
 
-            monitor_status = subprocess.run(['systemctl', 'status', 'freezerbot-monitor.service'], capture_output=True, text=True)
-            setup_status = subprocess.run(['systemctl', 'status', 'freezerbot-setup.service'], capture_output=True, text=True)
+            monitor_status = subprocess.run(['systemctl', 'status', 'freezerbot-monitor.service'], capture_output=True, text=True, check=True)
+            setup_status = subprocess.run(['systemctl', 'status', 'freezerbot-setup.service'], capture_output=True, text=True, check=True)
 
             if 'active (running)' not in monitor_status or setup_status:
                 self.logger.error('Monitor or setup service is not running after applying updates. Rolling back.')
@@ -128,8 +136,8 @@ class FirmwareUpdater:
         try:
             self.logger.info(f"Rolling back to backup: {backup_path}")
 
-            subprocess.run(["mv", backup_path, self.base_directory])
-            subprocess.run(["sudo", f'{self.base_directory}/install.sh'])
+            subprocess.run(["mv", backup_path, self.base_directory], check=True)
+            subprocess.run(["sudo", f'{self.base_directory}/install.sh'], check=True)
 
             return True
         except Exception as error:
