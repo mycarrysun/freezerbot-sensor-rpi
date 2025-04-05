@@ -381,6 +381,8 @@ class FirmwareUpdater:
                 })
                 if response.status_code != 200:
                     self.logger.error(f'Error sending api request: {response.status_code} - {response.status_text}')
+                else:
+                    self.logger.info('Successfully sent errors to api')
 
 
 if __name__ == "__main__":
