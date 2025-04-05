@@ -82,6 +82,7 @@ class TemperatureMonitor:
 
     def read_temperature(self):
         """Read temperature from sensor"""
+        print('Reading temperature')
         try:
             sensor = W1ThermSensor()
         except NoSensorFoundError as e:
@@ -90,6 +91,7 @@ class TemperatureMonitor:
             })
             raise
         degrees_c = sensor.get_temperature()
+        print(f'Got temperature: {degrees_c}C')
         return degrees_c
 
     def connected_to_wifi(self):
@@ -123,7 +125,9 @@ class TemperatureMonitor:
                     response = make_api_request('sensors/readings', json=payload)
 
                     if response.status_code == 201:
+                        print('Successfully sent reading')
                         self.consecutive_errors = []
+                        self.led_control.set_state('running')
                     else:
                         self.led_control.set_state("error")
                         self.consecutive_errors.append(f'API error: {response.status_code} - {response.text}')
@@ -139,6 +143,8 @@ class TemperatureMonitor:
                     self.consecutive_errors.append(traceback.format_exc())
 
                 if len(self.consecutive_errors) > 0:
+                    print(f'Consecutive errors: {len(self.consecutive_errors)}')
+                    print("\n\n".join(self.consecutive_errors))
                     response = make_api_request('sensors/reportError', json={
                         'errors': self.consecutive_errors
                     })

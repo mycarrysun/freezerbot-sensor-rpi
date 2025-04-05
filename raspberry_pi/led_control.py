@@ -132,6 +132,8 @@ class LedControl:
         if self.pwm:
             self.pwm.stop()
         self.stop_pattern_thread()
+        if self.disabled:
+            return
         GPIO.output(self.LED_PIN, GPIO.LOW)
 
 
