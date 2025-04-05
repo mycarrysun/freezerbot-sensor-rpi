@@ -6,13 +6,17 @@ import traceback
 import json
 from datetime import datetime
 from time import sleep
+from config import Config
+from api import api_token_exists
+from api import make_api_request
+from temperature_monitor import TemperatureMonitor
 
 
 class FirmwareUpdater:
     """
     Handles automatic firmware updates for Freezerbot devices with recovery capability
 
-    CAUTION: Be very careful when updating this file or the install.sh script
+    CAUTION: Be very careful when updating this file or the install.sh script!!
     Bugs will cause a rollback on the first 2 attempts, but on the third attempt no backup is created and will be rolled
     forward without verification of success. This is to allow bug fixes to be pulled when they exist in this script or
     the install.sh script. See: Updater Bootstrapping Problem
@@ -21,13 +25,13 @@ class FirmwareUpdater:
     def __init__(self):
         self.initialize_paths()
         self.setup_logging()
-        self.device_is_configured = os.path.exists(self.config_file_path)
+        self.config = Config()
         self.ensure_backup_directory_exists()
 
         # Load update history
         self.update_history = self.load_update_history()
 
-        self.logger.info(f"Firmware updater initialized. Device configured: {self.device_is_configured}")
+        self.logger.info(f"Firmware updater initialized. Device configured: {self.config.is_configured}")
         self.logger.info(f"Update attempt count: {len(self.update_history['attempts'])}")
 
     def setup_logging(self):
@@ -71,6 +75,11 @@ class FirmwareUpdater:
                 json.dump(self.update_history, f)
         except Exception as e:
             self.logger.error(f"Failed to save update history: {traceback.format_exc()}")
+
+    def add_error_to_update_attempt(self, error: str):
+        self.update_history['attempts'][-1]['errors'] = self.update_history['attempts'][-1]['errors'] or []
+        self.update_history['attempts'][-1]['errors'].append(error)
+        self.save_update_history()
 
     def ensure_backup_directory_exists(self):
         """Create backup directory if it doesn't exist"""
@@ -129,10 +138,14 @@ class FirmwareUpdater:
             )
             return backup_path
         except subprocess.CalledProcessError:
-            self.logger.error(f"Backup command failed: {traceback.format_exc()}")
+            error_text = f"Backup command failed: {traceback.format_exc()}"
+            self.logger.error(error_text)
+            self.add_error_to_update_attempt(error_text)
             return None
         except Exception as e:
-            self.logger.error(f"Backup failed: {traceback.format_exc()}")
+            error_text = f"Backup failed: {traceback.format_exc()}"
+            self.logger.error(error_text)
+            self.add_error_to_update_attempt(error_text)
             return None
 
     def updates_are_available(self):
@@ -182,16 +195,15 @@ class FirmwareUpdater:
         """Apply update with recovery strategies based on attempt count"""
         current_directory = os.getcwd()
         failure_count = len(self.update_history["attempts"])
-        recovery_level = min(failure_count, 2)
 
         # Record this attempt
         self.update_history["attempts"].append({
             "timestamp": datetime.now().timestamp(),
-            "recovery_level": recovery_level
+            "failure_count": failure_count
         })
         self.save_update_history()
 
-        self.logger.info(f"Attempting update with recovery level {recovery_level}")
+        self.logger.info(f"Attempting update with recovery level {min(failure_count, 2)}")
 
         try:
             os.chdir(self.base_directory)
@@ -211,7 +223,7 @@ class FirmwareUpdater:
             )
 
             # LEVEL 0: Standard update with full verification
-            if recovery_level < 2:
+            if failure_count < 2:
                 return self.verify_and_handle_rollback(backup_path, current_directory)
 
             # LEVEL 2: No rollback
@@ -222,10 +234,13 @@ class FirmwareUpdater:
                 return True
 
         except Exception as error:
-            self.logger.error(f"Update failed with recovery level {recovery_level}: {traceback.format_exc()}")
+            error_text = f"Update failed with recovery level {failure_count}: {traceback.format_exc()}"
+            self.logger.error(error_text)
+
+            self.add_error_to_update_attempt(error_text)
 
             # Only rollback for levels 0-1
-            if recovery_level < 2 and backup_path:
+            if failure_count < 2 and backup_path:
                 os.chdir(current_directory)
                 self.rollback_to_backup(backup_path)
 
@@ -250,7 +265,9 @@ class FirmwareUpdater:
 
         # Check if either service is running
         if 'active (running)' not in monitor_status.stdout and 'active (running)' not in setup_status.stdout:
-            self.logger.error('Neither monitor nor setup service is running after applying updates. Rolling back.')
+            error_text = 'Neither monitor nor setup service is running after applying updates. Rolling back.'
+            self.logger.error(error_text)
+            self.add_error_to_update_attempt(error_text+f"\n\n{monitor_status.stdout}\n\n{setup_status.stdout}")
             os.chdir(current_directory)
             self.rollback_to_backup(backup_path)
             return False
@@ -294,7 +311,9 @@ class FirmwareUpdater:
 
             return True
         except Exception as error:
-            self.logger.error(f"Rollback failed: {traceback.format_exc()}")
+            error_text = f"Rollback failed: {traceback.format_exc()}"
+            self.logger.error(error_text)
+            self.add_error_to_update_attempt(error_text)
             return False
 
     def run(self):
@@ -322,6 +341,18 @@ class FirmwareUpdater:
             self.logger.info("Firmware update completed successfully")
         else:
             self.logger.error('Firmware update failed')
+            if self.config.is_configured and len(self.update_history['attempts']) > 0:
+                if not api_token_exists():
+                    TemperatureMonitor().obtain_api_token()
+                errors = []
+                if 'errors' in self.update_history['attempts'][-1]:
+                    errors = self.update_history['attempts'][-1]['errors']
+                make_api_request('sensors/errors', json={
+                    'errors': [
+                        'Errors updating firmware',
+                        *errors
+                    ]
+                })
 
 
 if __name__ == "__main__":
