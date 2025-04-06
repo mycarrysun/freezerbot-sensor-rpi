@@ -26,8 +26,8 @@ mkdir -p "$OUTPUT_DIR"
 
 # Function to display usage information
 function display_usage {
-  echo "Usage: $0 <device>"
-  echo "Example: $0 /dev/sdb"
+  echo "Usage: $0 <device> <model name>"
+  echo "Example: $0 /dev/sdb 'Freezerbot Sensor Pro'"
   echo "WARNING: Be careful to specify the correct device!"
 }
 
@@ -82,12 +82,13 @@ function ensure_unmounted {
 }
 
 # Check if device argument was provided
-if [ $# -ne 1 ]; then
+if [ $# -ne 2 ]; then
   display_usage
   exit 1
 fi
 
 DEVICE=$1
+MODEL_NAME=$2
 check_block_device "$DEVICE"
 
 echo "WARNING: This will clean the SD card at $DEVICE for imaging."
@@ -118,6 +119,9 @@ echo "Cleaning up Freezerbot dynamic files..."
 rm -rf "$MOUNT_POINT/$FREEZERBOT_DIR/config.json"
 rm -rf "$MOUNT_POINT/$FREEZERBOT_DIR/.env"
 rm -rf "$MOUNT_POINT/$FREEZERBOT_DIR/device_info.json"
+
+# add the model name to .env
+echo "MODEL_NAME=$MODEL_NAME" > "$MOUNT_POINT/$FREEZERBOT_DIR/.env"
 
 # Remove logs and backups
 rm -rf "$MOUNT_POINT/$PI_DIR/freezerbot-logs/"*

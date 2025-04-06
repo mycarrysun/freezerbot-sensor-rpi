@@ -20,7 +20,7 @@ GPIO Connections:
 2. Temperature Sensor (DS18B20):
    - Connect VCC to 3.3V (pin 17)
    - Connect GND to GND (pin 25)
-   - Connect DATA to GPIO 4 (pin 23)
+   - Connect DATA to GPIO 11 (pin 23)
    - Connect a 4.7k pull-up resistor between DATA and VCC
 
 Installation:
