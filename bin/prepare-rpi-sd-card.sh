@@ -124,7 +124,7 @@ rm -rf "$MOUNT_POINT/$FREEZERBOT_DIR/.env"
 rm -rf "$MOUNT_POINT/$FREEZERBOT_DIR/device_info.json"
 
 # add the model name to .env
-echo "MODEL_NAME=\"$MODEL_NAME\"" > "$MOUNT_POINT/$FREEZERBOT_DIR/.env"
+echo "MODEL_NAME=$MODEL_NAME" >> "$MOUNT_POINT/$FREEZERBOT_DIR/.env"
 
 # Remove logs and backups
 rm -rf "$MOUNT_POINT/$PI_DIR/freezerbot-logs/"*
