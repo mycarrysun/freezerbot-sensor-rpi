@@ -8,6 +8,9 @@ import traceback
 
 from dotenv import load_dotenv
 
+from restarts import restart_in_setup_mode
+from config import Config
+
 LED_CONTROL_DISABLED = 'LED_DISABLED'
 
 class LedControl:
@@ -19,6 +22,7 @@ class LedControl:
         self.module_disabled = os.getenv(LED_CONTROL_DISABLED) == 'true'
         self.led_disabled = False
         self.button_disabled = False
+        self.config = Config()
 
         self.BUTTON_PIN = 17
         self.LED_PIN = 27
@@ -101,7 +105,8 @@ class LedControl:
                 elif button_pressed and time.time() - press_start_time > 10:
                     print("Long press detected (10 seconds) - triggering reset")
                     button_pressed = False  # Reset so we don't trigger multiple times
-                    self.restart_in_setup_mode()
+                    self.config.clear_config()
+                    restart_in_setup_mode()
 
                 # Small sleep to prevent CPU hogging
                 time.sleep(0.1)

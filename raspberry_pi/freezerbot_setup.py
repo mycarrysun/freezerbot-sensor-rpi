@@ -7,6 +7,7 @@ from flask import Flask, request, render_template, redirect, jsonify
 
 from config import Config
 from led_control import LedControl
+from restarts import restart_in_sensor_mode
 
 
 class FreezerBotSetup:
@@ -24,32 +25,6 @@ class FreezerBotSetup:
                          static_folder='static',
                          template_folder='templates')
         self.setup_routes()
-
-
-    def restart_in_setup_mode(self):
-        """Restart in setup mode - only used when button is explicitly held"""
-        self.led_control.set_state("reset")
-        time.sleep(2)
-        subprocess.run(["/usr/bin/systemctl", "enable", "freezerbot-setup.service"])
-        subprocess.run(["/usr/bin/systemctl", "restart", "freezerbot-setup.service"])
-        subprocess.run(["/usr/bin/systemctl", "disable", "freezerbot-monitor.service"])
-        subprocess.run(["/usr/bin/systemctl", "stop", "freezerbot-monitor.service"])
-
-    def restart_in_sensor_mode(self):
-        subprocess.run(["/usr/bin/systemctl", "stop", "hostapd.service"])
-        subprocess.run(["/usr/bin/systemctl", "stop", "dnsmasq.service"])
-
-        # Re-enable NetworkManager control of wlan0
-        subprocess.run(["/usr/bin/nmcli", "device", "set", "wlan0", "managed", "yes"])
-        subprocess.run(["/usr/bin/systemctl", "restart", "NetworkManager.service"])
-
-        # Wait a moment for NetworkManager to initialize
-        time.sleep(5)
-
-        subprocess.run(["/usr/bin/systemctl", "enable", "freezerbot-monitor.service"])
-        subprocess.run(["/usr/bin/systemctl", "restart", "freezerbot-monitor.service"])
-        subprocess.run(["/usr/bin/systemctl", "disable", "freezerbot-setup.service"])
-        subprocess.run(["/usr/bin/systemctl", "stop", "freezerbot-setup.service"])
 
     def setup_routes(self):
         """Set up the web routes for the configuration portal"""
@@ -127,7 +102,7 @@ class FreezerBotSetup:
 
             self.setup_network_manager(networks)
 
-            self.restart_in_sensor_mode()
+            restart_in_sensor_mode()
 
             return jsonify({"success": True})
         except Exception as e:
@@ -330,7 +305,7 @@ address=/#/192.168.4.1
                 self.led_control.set_state("error")
         else:
             print("Device already configured, exiting setup mode")
-            self.restart_in_sensor_mode()
+            restart_in_sensor_mode()
 
     def cleanup(self):
         """Clean up GPIO on exit"""

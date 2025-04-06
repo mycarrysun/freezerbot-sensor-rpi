@@ -15,6 +15,7 @@ from api import make_api_request, api_token_exists, set_api_token, make_api_requ
 from freezerbot_setup import FreezerBotSetup
 from config import Config
 from pisugar import PiSugarMonitor
+from restarts import restart_in_setup_mode
 
 
 class TemperatureMonitor:
@@ -34,11 +35,11 @@ class TemperatureMonitor:
         """Check for a valid config file"""
         if not self.config.configuration_exists:
             print("Configuration file not found. Will restart in setup mode.")
-            self.freezerbot_setup.restart_in_setup_mode()
+            restart_in_setup_mode()
             exit(0)
         if not self.config.is_configured:
             print("Configuration file is invalid. Restarting in setup mode.")
-            self.freezerbot_setup.restart_in_setup_mode()
+            restart_in_setup_mode()
             exit(0)
 
     def obtain_api_token(self):
@@ -65,7 +66,7 @@ class TemperatureMonitor:
                 print('Deleting email and password and restarting in setup mode')
                 self.config.add_config_error('Email or password is incorrect. Please provide the email and password you use to login to the Freezerbot app.')
                 self.config.clear_creds_from_config()
-                self.freezerbot_setup.restart_in_setup_mode()
+                restart_in_setup_mode()
             elif response.status_code != 201:
                 print(f'Error obtaining token: {response.status_code} {response.text}')
             else:
