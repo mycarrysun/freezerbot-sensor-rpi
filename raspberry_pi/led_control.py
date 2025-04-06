@@ -4,6 +4,7 @@ import RPi.GPIO as GPIO
 import time
 import sys
 import threading
+import traceback
 
 from dotenv import load_dotenv
 
@@ -31,9 +32,15 @@ class LedControl:
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.LED_PIN, GPIO.OUT)
         GPIO.setup(self.BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        GPIO.add_event_detect(self.BUTTON_PIN, GPIO.FALLING,
+
+        try:
+
+            GPIO.add_event_detect(self.BUTTON_PIN, GPIO.FALLING,
                               callback=self.button_pressed_callback,
                               bouncetime=300)
+        except Exception:
+            self.disabled = True
+            print(f"Disabling LedControl because button event detection setup failed: {traceback.format_exc()}")
 
     def button_pressed_callback(self, channel):
         """Handle button press events"""
