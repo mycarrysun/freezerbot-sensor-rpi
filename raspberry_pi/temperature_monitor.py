@@ -14,6 +14,7 @@ from gpiozero import CPUTemperature
 from api import make_api_request, api_token_exists, set_api_token, make_api_request_with_creds
 from freezerbot_setup import FreezerBotSetup
 from config import Config
+from pisugar import PiSugarMonitor
 
 
 class TemperatureMonitor:
@@ -25,6 +26,7 @@ class TemperatureMonitor:
 
         self.led_control = LedControl()
         self.freezerbot_setup = FreezerBotSetup()
+        self.pisugar = PiSugarMonitor()
 
         self.validate_config()
 
@@ -91,7 +93,6 @@ class TemperatureMonitor:
             })
             raise
         degrees_c = sensor.get_temperature()
-        print(f'Got temperature: {degrees_c}C')
         return degrees_c
 
     def connected_to_wifi(self):
@@ -119,7 +120,13 @@ class TemperatureMonitor:
                     payload = {
                         "degrees_c": temperature,
                         "cpu_degrees_c": CPUTemperature().temperature,
-                        "taken_at": datetime.utcnow().isoformat() + 'Z'
+                        "taken_at": datetime.utcnow().isoformat() + 'Z',
+                        'battery_level': self.pisugar.get_battery_level(),
+                        'battery_amps': self.pisugar.get_current(),
+                        'battery_volts': self.pisugar.get_voltage(),
+                        'is_charging': self.pisugar.is_charging(),
+                        'is_plugged_in': self.pisugar.is_power_plugged(),
+                        'is_allowed_to_charge': self.pisugar.is_charging_allowed()
                     }
 
                     response = make_api_request('sensors/readings', json=payload)
