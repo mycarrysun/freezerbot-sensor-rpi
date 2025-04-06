@@ -28,8 +28,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 cd "$SCRIPT_DIR/../mnt/rootfs/home/pi/freezerbot"
 
-git pull
+# Capture the output of git pull
+GIT_OUTPUT=$(git pull 2>&1) || {
+  echo "Git pull failed, unmounting without shrinking"
+  echo "Git output: $GIT_OUTPUT"
+  cd -
+  "$SCRIPT_DIR/unmount-image.sh" "$IMAGE_FILE"
+  exit 1
+}
 
 cd -
 
-"$SCRIPT_DIR/unmount-and-shrink.sh" "$IMAGE_FILE"
+# Check if there were changes
+if [[ "$GIT_OUTPUT" == *"Already up to date"* ]]; then
+  echo "No changes detected from git pull, unmounting without shrinking"
+  "$SCRIPT_DIR/unmount-image.sh" "$IMAGE_FILE"
+else
+  echo "$GIT_OUTPUT"
+  echo "Changes successfully pulled, unmounting and shrinking"
+  "$SCRIPT_DIR/unmount-and-shrink.sh" "$IMAGE_FILE"
+fi
