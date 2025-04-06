@@ -190,6 +190,7 @@ class TemperatureMonitor:
 if __name__ == "__main__":
     try:
         monitor = TemperatureMonitor()
+        monitor.led_control.set_state('running')
         monitor.run()
     except KeyboardInterrupt:
         monitor.cleanup()

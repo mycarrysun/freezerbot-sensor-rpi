@@ -8,17 +8,17 @@ import traceback
 
 from dotenv import load_dotenv
 
-LED_DISABLED = 'LED_DISABLED'
+LED_CONTROL_DISABLED = 'LED_DISABLED'
 
 class LedControl:
     """Class for controlling the button's built-in LED"""
 
-    _is_initialized = False
-
     def __init__(self):
         """Initialize the LED control with the specified pin"""
         load_dotenv(override=True)
-        self.disabled = os.getenv(LED_DISABLED) == 'true'
+        self.module_disabled = os.getenv(LED_CONTROL_DISABLED) == 'true'
+        self.led_disabled = False
+        self.button_disabled = False
 
         self.BUTTON_PIN = 17
         self.LED_PIN = 27
@@ -27,56 +27,92 @@ class LedControl:
         self.running = False
         self.current_state = None
 
-        self.setup()
+        # Initialize GPIO
+        try:
+            # Clean any previous setup
+            GPIO.cleanup()
+        except:
+            pass
 
-    def setup(self):
-        """Configure GPIO pin for button"""
-        if self.disabled:
+        GPIO.setmode(GPIO.BCM)
+
+        self.setup_led()
+        self.setup_button()
+
+    def setup_led(self):
+        """Set up the LED pin separately from button"""
+        if self.module_disabled:
             return
-
-        # Setup GPIO mode only once
-        if not LedControl._is_initialized:
-            GPIO.setmode(GPIO.BCM)
-            LedControl._is_initialized = True
-
-        # Configure pins
-        GPIO.setup(self.LED_PIN, GPIO.OUT)
-        GPIO.setup(self.BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
         try:
-            # Check if event detection is already set for this pin
-            try:
-                # Remove any existing event detection first
-                GPIO.remove_event_detect(self.BUTTON_PIN)
-            except:
-                # Ignore errors when trying to remove event detection
-                pass
+            GPIO.setup(self.LED_PIN, GPIO.OUT)
+            print(f"LED pin {self.LED_PIN} configured successfully")
 
-            # Now add the event detection
-            GPIO.add_event_detect(self.BUTTON_PIN, GPIO.FALLING,
-                                  callback=self.button_pressed_callback,
-                                  bouncetime=300)
-        except Exception:
-            self.disabled = True
-            print(f"Disabling LedControl because button event detection setup failed: {traceback.format_exc()}")
-            # Additional diagnostic information
-            print(f"Current GPIO function for BUTTON_PIN ({self.BUTTON_PIN}): {GPIO.gpio_function(self.BUTTON_PIN)}")
+            # Test the LED by blinking once
+            GPIO.output(self.LED_PIN, GPIO.HIGH)
+            time.sleep(0.2)
+            GPIO.output(self.LED_PIN, GPIO.LOW)
+        except Exception as e:
+            print(f"LED setup failed: {traceback.format_exc()}")
+            self.led_disabled = True
 
-    def button_pressed_callback(self, channel):
-        """Handle button press events"""
-        if self.disabled:
+    def setup_button(self):
+        """Set up the button separately with fallback"""
+        if self.module_disabled:
             return
-        # Check how long the button is held
-        start_time = time.time()
-        while GPIO.input(self.BUTTON_PIN) == GPIO.LOW:
-            time.sleep(0.1)
-            if time.time() - start_time > 10:  # 10-second hold
-                self.restart_in_setup_mode()
-                break
+
+        try:
+            GPIO.setup(self.BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+            # Start a separate thread to poll the button state instead of using event detection
+            self.running = True
+            self.button_thread = threading.Thread(target=self.poll_button_state)
+            self.button_thread.daemon = True
+            self.button_thread.start()
+            print(f"Button pin {self.BUTTON_PIN} configured in polling mode")
+        except Exception as e:
+            print(f"Button setup failed: {traceback.format_exc()}")
+            print("Button functionality will be disabled")
+            self.button_disabled = True
+
+    def poll_button_state(self):
+        """Poll the button state instead of using event detection"""
+        print("Starting button polling thread")
+        button_pressed = False
+        press_start_time = 0
+
+        while self.running and not self.button_disabled:
+            try:
+                current_state = GPIO.input(self.BUTTON_PIN)
+
+                # Button pressed (LOW when pressed with pull-up resistor)
+                if current_state == GPIO.LOW and not button_pressed:
+                    button_pressed = True
+                    press_start_time = time.time()
+                    print("Button pressed")
+
+                # Button released
+                elif current_state == GPIO.HIGH and button_pressed:
+                    button_pressed = False
+                    duration = time.time() - press_start_time
+                    print(f"Button released after {duration:.1f} seconds")
+
+                # Check for long press while button is still pressed
+                elif button_pressed and time.time() - press_start_time > 10:
+                    print("Long press detected (10 seconds) - triggering reset")
+                    button_pressed = False  # Reset so we don't trigger multiple times
+                    self.restart_in_setup_mode()
+
+                # Small sleep to prevent CPU hogging
+                time.sleep(0.1)
+
+            except Exception as e:
+                print(f"Error in button polling: {str(e)}")
+                time.sleep(1)  # Longer sleep on error
 
     def set_state(self, state):
         """Set the LED to different states based on mode"""
-        if self.disabled:
+        if self.module_disabled or self.led_disabled:
             return
         # Stop any existing pattern thread
         self.stop_pattern_thread()
@@ -118,7 +154,7 @@ class LedControl:
 
     def wifi_issue_pattern(self):
         """LED pattern for WiFi connectivity issues: double-blink with pause"""
-        if self.disabled:
+        if self.module_disabled or self.led_disabled:
             return
         while self.running and self.current_state == "wifi_issue":
             # Double blink
@@ -135,7 +171,7 @@ class LedControl:
 
     def start_pattern_thread(self, pattern_function):
         """Start a thread to run a custom LED pattern"""
-        if self.disabled:
+        if self.module_disabled:
             return
         if self.pwm:
             self.pwm.stop()
@@ -156,12 +192,13 @@ class LedControl:
     def cleanup(self):
         """Clean up resources"""
         self.running = False
+        if hasattr(self, 'button_thread') and self.button_thread.is_alive():
+            self.button_thread.join(timeout=0.5)
         if self.pwm:
             self.pwm.stop()
         self.stop_pattern_thread()
-        if self.disabled:
-            return
-        GPIO.output(self.LED_PIN, GPIO.LOW)
+        if not self.led_disabled:
+            GPIO.output(self.LED_PIN, GPIO.LOW)
 
 
 if __name__ == "__main__":
