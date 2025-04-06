@@ -51,16 +51,6 @@ function check_block_device {
   fi
 }
 
-# Function to install pishrink if needed
-function ensure_pishrink {
-  if ! command -v pishrink.sh &> /dev/null; then
-    echo "Installing PiShrink..."
-    wget https://raw.githubusercontent.com/Drewsif/PiShrink/master/pishrink.sh
-    chmod +x pishrink.sh
-    sudo mv pishrink.sh /usr/local/bin/
-  fi
-}
-
 # Function to safely unmount partitions if already mounted
 function ensure_unmounted {
     local device=$1
@@ -154,16 +144,11 @@ echo "Unmounting partitions..."
 umount "$MOUNT_POINT/boot"
 umount "$MOUNT_POINT"
 
-# Ensure pishrink is available
-ensure_pishrink
-
 # Create the image file
 echo "Creating image file from SD card..."
 dd if="$DEVICE" of="$OUTPUT_FILE" bs=4M status=progress
 
-# Shrink the image file
-echo "Shrinking image file..."
-pishrink.sh -z "$OUTPUT_FILE" "$PISHRINK_OUTPUT_FILE"
+"$SCRIPT_DIR/shrink-image.sh" "$OUTPUT_FILE" "$PISHRINK_OUTPUT_FILE"
 
 echo "SD card image has been created and shrunk successfully."
 echo "Image location: $OUTPUT_FILE"

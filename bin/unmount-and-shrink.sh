@@ -81,7 +81,6 @@ echo "Output: $OUTPUT_FILE"
 
 ensure_pishrink
 
-# Apply PiShrink
-pishrink.sh -z "$IMAGE_FILE" "$OUTPUT_FILE"
+"$SCRIPT_DIR/shrink-image.sh" "$IMAGE_FILE" "$OUTPUT_FILE"
 
 echo "Done! Shrunk image saved as: $OUTPUT_FILE"
