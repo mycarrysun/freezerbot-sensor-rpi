@@ -87,6 +87,8 @@ class LedControl:
 
         while self.running and not self.button_disabled:
             try:
+                if GPIO.getmode() != GPIO.BCM:
+                    GPIO.setmode(GPIO.BCM)
                 current_state = GPIO.input(self.BUTTON_PIN)
 
                 # Button pressed (LOW when pressed with pull-up resistor)
