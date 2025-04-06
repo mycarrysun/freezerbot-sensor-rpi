@@ -35,11 +35,11 @@ class TemperatureMonitor:
         if not self.config.configuration_exists:
             print("Configuration file not found. Will restart in setup mode.")
             self.freezerbot_setup.restart_in_setup_mode()
-            return
+            exit(0)
         if not self.config.is_configured:
             print("Configuration file is invalid. Restarting in setup mode.")
             self.freezerbot_setup.restart_in_setup_mode()
-            return
+            exit(0)
 
     def obtain_api_token(self):
         if not api_token_exists():

@@ -123,9 +123,6 @@ rm -rf "$MOUNT_POINT/$FREEZERBOT_DIR/config.json"
 rm -rf "$MOUNT_POINT/$FREEZERBOT_DIR/.env"
 rm -rf "$MOUNT_POINT/$FREEZERBOT_DIR/device_info.json"
 
-# add the model name to .env
-echo "MODEL_NAME=$MODEL_NAME" >> "$MOUNT_POINT/$FREEZERBOT_DIR/.env"
-
 # Remove logs and backups
 rm -rf "$MOUNT_POINT/$PI_DIR/freezerbot-logs/"*
 rm -rf "$MOUNT_POINT/$PI_DIR/freezerbot-backups/"*
@@ -149,6 +146,8 @@ rm -rf "$MOUNT_POINT/var/log/journal/"*
 rm -f "$MOUNT_POINT/var/log/"*.log
 rm -f "$MOUNT_POINT/var/log/"*.gz
 
+# Setup files with contents
+echo "MODEL_NAME=$MODEL_NAME" >> "$MOUNT_POINT/$FREEZERBOT_DIR/.env"
 echo "freezerbot" > "$MOUNT_POINT/etc/hostname"
 
 echo "Unmounting partitions..."
