@@ -36,11 +36,15 @@ class FreezerBotSetup:
         subprocess.run(["/usr/bin/systemctl", "stop", "freezerbot-monitor.service"])
 
     def restart_in_sensor_mode(self):
+        subprocess.run(["/usr/bin/systemctl", "stop", "hostapd.service"])
+        subprocess.run(["/usr/bin/systemctl", "stop", "dnsmasq.service"])
+
         # Re-enable NetworkManager control of wlan0
         subprocess.run(["/usr/bin/nmcli", "device", "set", "wlan0", "managed", "yes"])
+        subprocess.run(["/usr/bin/systemctl", "restart", "NetworkManager.service"])
 
-        subprocess.Popen(["/usr/bin/systemctl", "stop", "hostapd.service"])
-        subprocess.Popen(["/usr/bin/systemctl", "stop", "dnsmasq.service"])
+        # Wait a moment for NetworkManager to initialize
+        time.sleep(5)
 
         subprocess.run(["/usr/bin/systemctl", "enable", "freezerbot-monitor.service"])
         subprocess.run(["/usr/bin/systemctl", "restart", "freezerbot-monitor.service"])
