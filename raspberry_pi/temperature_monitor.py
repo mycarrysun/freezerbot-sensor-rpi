@@ -61,7 +61,7 @@ class TemperatureMonitor:
                 }}
             )
 
-            if response.status_code == 401:
+            if response.status_code == 401 or response.status_code == 403:
                 print('Deleting email and password and restarting in setup mode')
                 self.config.add_config_error('Email or password is incorrect. Please provide the email and password you use to login to the Freezerbot app.')
                 self.config.clear_creds_from_config()
