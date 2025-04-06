@@ -12,24 +12,35 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-# Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MOUNT_POINT="/mnt/freezerbot-sd-card"
-OUTPUT_DIR="$SCRIPT_DIR/../images"
-CURRENT_DATE=$(date +%Y%m%d)
-OUTPUT_FILE="$OUTPUT_DIR/freezerbot-$CURRENT_DATE.img"
-PISHRINK_OUTPUT_FILE="$OUTPUT_DIR/freezerbot-$CURRENT_DATE.pishrink.img.gz"
-FREEZERBOT_DIR="/home/pi/freezerbot"
-PI_DIR="/home/pi"
-
-mkdir -p "$OUTPUT_DIR"
-
 # Function to display usage information
 function display_usage {
   echo "Usage: $0 <device> <model name>"
   echo "Example: $0 /dev/sdb 'Freezerbot Sensor Pro'"
   echo "WARNING: Be careful to specify the correct device!"
 }
+
+# Check if device argument was provided
+if [ $# -ne 2 ]; then
+  display_usage
+  exit 1
+fi
+
+DEVICE=$1
+MODEL_NAME=$2
+
+# Configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MOUNT_POINT="/mnt/freezerbot-sd-card"
+OUTPUT_DIR="$SCRIPT_DIR/../images"
+CURRENT_DATE=$(date +%Y%m%d)
+OUTPUT_FILE="$OUTPUT_DIR/${MODEL_NAME// /-}-$CURRENT_DATE.img"
+PISHRINK_OUTPUT_FILE="$OUTPUT_DIR/${MODEL_NAME// /-}-$CURRENT_DATE.pishrink.img.gz"
+FREEZERBOT_DIR="/home/pi/freezerbot"
+PI_DIR="/home/pi"
+
+mkdir -p "$OUTPUT_DIR"
+
+
 
 # Function to check if argument is a valid block device
 function check_block_device {
@@ -81,14 +92,6 @@ function ensure_unmounted {
     fi
 }
 
-# Check if device argument was provided
-if [ $# -ne 2 ]; then
-  display_usage
-  exit 1
-fi
-
-DEVICE=$1
-MODEL_NAME=$2
 check_block_device "$DEVICE"
 
 echo "WARNING: This will clean the SD card at $DEVICE for imaging."
@@ -121,7 +124,7 @@ rm -rf "$MOUNT_POINT/$FREEZERBOT_DIR/.env"
 rm -rf "$MOUNT_POINT/$FREEZERBOT_DIR/device_info.json"
 
 # add the model name to .env
-echo "MODEL_NAME=$MODEL_NAME" > "$MOUNT_POINT/$FREEZERBOT_DIR/.env"
+echo "MODEL_NAME=\"$MODEL_NAME\"" > "$MOUNT_POINT/$FREEZERBOT_DIR/.env"
 
 # Remove logs and backups
 rm -rf "$MOUNT_POINT/$PI_DIR/freezerbot-logs/"*
