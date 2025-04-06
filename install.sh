@@ -18,9 +18,14 @@ apt-get install -y python3-venv python3-pip git hostapd dnsmasq
 
 # Create directory structure
 echo "Setting up directory structure..."
-mkdir -p /home/pi/freezerbot-backups
-mkdir -p /home/pi/freezerbot-logs
-FREEZERBOT_DIR="/home/pi/freezerbot"
+PI_DIR=/home/pi
+LOGS_DIR="$PI_DIR/freezerbot-logs"
+BACKUPS_DIR="$PI_DIR/freezerbot-backups"
+FREEZERBOT_DIR="$PI_DIR/freezerbot"
+FREEZERBOT_PYTHON_DIR="$FREEZERBOT_DIR/raspberry_pi"
+
+mkdir -p "$BACKUPS_DIR"
+mkdir -p "$LOGS_DIR"
 mkdir -p $FREEZERBOT_DIR
 
 # Create device info file with model name and firmware version
@@ -74,5 +79,8 @@ chmod 644 /etc/systemd/system/freezerbot-updater.timer
 # Enable services
 systemctl daemon-reload
 $FREEZERBOT_DIR/.venv/bin/python $FREEZERBOT_DIR/raspberry_pi/start.py
+
+echo "Setting up startup script..."
+echo "@reboot $FREEZERBOT_DIR/.venv/bin/python $FREEZERBOT_PYTHON_DIR/start.py >> $LOGS_DIR/start.log" | crontab -u pi -
 
 echo "Installation complete! Freezerbot is now running."
