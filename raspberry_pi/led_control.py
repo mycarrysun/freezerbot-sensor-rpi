@@ -13,6 +13,8 @@ LED_DISABLED = 'LED_DISABLED'
 class LedControl:
     """Class for controlling the button's built-in LED"""
 
+    _is_initialized = False
+
     def __init__(self):
         """Initialize the LED control with the specified pin"""
         load_dotenv(override=True)
