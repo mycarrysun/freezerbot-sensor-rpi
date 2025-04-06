@@ -43,10 +43,10 @@ fi
 # Get Raspberry Pi serial number using the same technique from the setup file
 SERIAL=$(grep "Serial" /proc/cpuinfo | cut -d ":" -f 2 | tr -d " ")
 
-# Create JSON file with model name and firmware version
+# Create JSON file with model name (quotes stripped) and firmware version
 cat > $FREEZERBOT_DIR/device_info.json << EOF
 {
-  "model_name": "${MODEL_NAME}",
+  "model_name": "${MODEL_NAME//\"/}",
   "firmware_version": "$GIT_SHA",
   "serial": "$SERIAL"
 }
@@ -78,7 +78,7 @@ chmod 644 /etc/systemd/system/freezerbot-updater.timer
 
 # Enable services
 systemctl daemon-reload
-$FREEZERBOT_DIR/.venv/bin/python $FREEZERBOT_DIR/raspberry_pi/start.py
+$FREEZERBOT_DIR/.venv/bin/python $FREEZERBOT_PYTHON_DIR/start.py
 
 echo "Setting up startup script..."
 echo "@reboot $FREEZERBOT_DIR/.venv/bin/python $FREEZERBOT_PYTHON_DIR/start.py >> $LOGS_DIR/start.log" | crontab -u pi -
