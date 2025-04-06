@@ -149,6 +149,8 @@ rm -rf "$MOUNT_POINT/var/log/journal/"*
 rm -f "$MOUNT_POINT/var/log/"*.log
 rm -f "$MOUNT_POINT/var/log/"*.gz
 
+echo "freezerbot" > "$MOUNT_POINT/etc/hostname"
+
 echo "Unmounting partitions..."
 umount "$MOUNT_POINT/boot"
 umount "$MOUNT_POINT"
