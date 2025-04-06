@@ -1,24 +1,25 @@
 import socket
 import json
 import traceback
-import os
 
 
 class PiSugarMonitor:
-    """Interface for monitoring PiSugar battery status using the official PiSugar server"""
+    """Interface for monitoring PiSugar battery status using TCP socket connection"""
 
-    def __init__(self, socket_path="/tmp/pisugar-server.sock"):
+    def __init__(self, host="127.0.0.1", port=8423):
         """
         Initialize the PiSugar monitor
 
         Args:
-            socket_path: Path to the PiSugar server socket
+            host: PiSugar server hostname or IP
+            port: PiSugar server port
         """
-        self.socket_path = socket_path
+        self.host = host
+        self.port = port
 
     def _send_command(self, command):
         """
-        Send a command to the PiSugar server via Unix socket
+        Send a command to the PiSugar server via TCP socket
 
         Args:
             command: Command string to send
@@ -27,23 +28,27 @@ class PiSugarMonitor:
             Response data as a dictionary or None if error
         """
         try:
-            if not os.path.exists(self.socket_path):
-                print(f"PiSugar socket not found at {self.socket_path}. Is the PiSugar server installed and running?")
-                return None
+            # Create a TCP socket
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)  # 5 second timeout
 
-            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sock.connect(self.socket_path)
+            # Connect to the server
+            sock.connect((self.host, self.port))
 
-            # Send command
-            sock.sendall(command.encode('utf-8'))
+            # Send command with newline
+            sock.sendall(f"{command}\n".encode('utf-8'))
 
             # Read response
             response = sock.recv(4096).decode('utf-8').strip()
             sock.close()
 
-            # Parse JSON response
+            # Parse JSON response if possible
             if response:
-                return json.loads(response)
+                try:
+                    return json.loads(response)
+                except json.JSONDecodeError:
+                    # If not JSON, return as text
+                    return {"text": response}
             return None
 
         except Exception:
@@ -58,11 +63,26 @@ class PiSugarMonitor:
             Float percentage (0-100) or None if error
         """
         response = self._send_command("get battery")
-        if response and "level" in response:
+        if response:
             try:
-                # PiSugar returns level as a decimal (0.0-1.0), convert to percentage
-                return float(response["level"]) * 100
+                # PiSugar might return level as a decimal (0.0-1.0) or directly
+                level = response.get("level", 0)
+                # Check if the level is already a percentage or needs conversion
+                if isinstance(level, (int, float)) and level <= 1.0:
+                    return float(level) * 100
+                else:
+                    return float(level)
             except (ValueError, TypeError):
+                # Try text parsing if JSON parsing failed
+                if isinstance(response, dict) and "text" in response:
+                    text = response["text"]
+                    # Try to extract percentage from text like "battery: 85%"
+                    if "battery" in text and "%" in text:
+                        try:
+                            percentage = float(text.split("%")[0].split(":")[-1].strip())
+                            return percentage
+                        except (ValueError, IndexError):
+                            pass
                 print(f"Error parsing battery level: {response}")
                 return None
         return None
@@ -75,8 +95,14 @@ class PiSugarMonitor:
             Boolean or None if error
         """
         response = self._send_command("get battery_charging")
-        if response and "charging" in response:
-            return bool(response["charging"])
+        if response:
+            # Handle both JSON and text responses
+            if isinstance(response, dict):
+                if "charging" in response:
+                    return bool(response["charging"])
+                elif "text" in response:
+                    return "true" in response["text"].lower()
+            return False
         return None
 
     def get_battery_voltage(self):
@@ -87,9 +113,20 @@ class PiSugarMonitor:
             Float voltage or None if error
         """
         response = self._send_command("get battery_voltage")
-        if response and "voltage" in response:
+        if response:
             try:
-                return float(response["voltage"])
+                # Try JSON first
+                if "voltage" in response:
+                    return float(response["voltage"])
+                # Try text parsing
+                elif "text" in response:
+                    text = response["text"]
+                    if "voltage" in text and "v" in text.lower():
+                        try:
+                            voltage = float(text.split("v")[0].split(":")[-1].strip())
+                            return voltage
+                        except (ValueError, IndexError):
+                            pass
             except (ValueError, TypeError):
                 print(f"Error parsing battery voltage: {response}")
                 return None
@@ -103,8 +140,17 @@ class PiSugarMonitor:
             Model string or None if error
         """
         response = self._send_command("get model")
-        if response and "model" in response:
-            return response["model"]
+        if response:
+            if "model" in response:
+                return response["model"]
+            elif "text" in response:
+                text = response["text"]
+                if "model" in text.lower():
+                    try:
+                        model = text.split(":")[-1].strip()
+                        return model
+                    except (ValueError, IndexError):
+                        pass
         return None
 
     def get_full_status(self):
@@ -114,41 +160,48 @@ class PiSugarMonitor:
         Returns:
             Dictionary with battery status or None if error
         """
-        result = {}
-
-        # Get battery level
+        # Get individual values to build status
         level = self.get_battery_level()
-        if level is not None:
-            result["level"] = level
-
-        # Get charging status
         charging = self.is_charging()
-        if charging is not None:
-            result["charging"] = charging
-
-        # Get voltage
         voltage = self.get_battery_voltage()
-        if voltage is not None:
-            result["voltage"] = voltage
-
-        # Get model
         model = self.get_model()
-        if model is not None:
-            result["model"] = model
 
-        return result if result else None
+        # Check if we got at least one valid response
+        if level is not None or charging is not None or voltage is not None or model is not None:
+            return {
+                "level": level,
+                "charging": charging,
+                "voltage": voltage,
+                "model": model
+            }
+        return None
 
 
 # Example usage
 if __name__ == "__main__":
-    # For testing
     monitor = PiSugarMonitor()
+
+    # Try to get individual values
+    level = monitor.get_battery_level()
+    charging = monitor.is_charging()
+    voltage = monitor.get_battery_voltage()
+    model = monitor.get_model()
+
+    print(f"Individual queries:")
+    print(f"Battery Level: {level}%")
+    print(f"Charging: {'Yes' if charging else 'No'}")
+    print(f"Voltage: {voltage} V")
+    print(f"Model: {model}")
+    print()
+
+    # Try the full status method
+    print(f"Full status query:")
     status = monitor.get_full_status()
     if status:
-        print(f"Battery Level: {status.get('level', 'Unknown')}%")
+        print(f"Battery Level: {status.get('level')}%")
         print(f"Charging: {'Yes' if status.get('charging') else 'No'}")
-        print(f"Voltage: {status.get('voltage', 'Unknown')} V")
-        print(f"Model: {status.get('model', 'Unknown')}")
+        print(f"Voltage: {status.get('voltage')} V")
+        print(f"Model: {status.get('model')}")
     else:
         print("Could not get PiSugar status. Is the PiSugar server installed and running?")
         print("To install the PiSugar server, run:")
