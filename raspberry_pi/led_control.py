@@ -22,25 +22,43 @@ class LedControl:
         self.LED_PIN = 27
         self.pattern_thread = None
         self.pwm = None
+        self.running = False
+        self.current_state = None
+
         self.setup()
 
     def setup(self):
         """Configure GPIO pin for button"""
         if self.disabled:
             return
-        # Setup button with pull-up resistor
-        GPIO.setmode(GPIO.BCM)
+
+        # Setup GPIO mode only once
+        if not LedControl._is_initialized:
+            GPIO.setmode(GPIO.BCM)
+            LedControl._is_initialized = True
+
+        # Configure pins
         GPIO.setup(self.LED_PIN, GPIO.OUT)
         GPIO.setup(self.BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
         try:
+            # Check if event detection is already set for this pin
+            try:
+                # Remove any existing event detection first
+                GPIO.remove_event_detect(self.BUTTON_PIN)
+            except:
+                # Ignore errors when trying to remove event detection
+                pass
 
+            # Now add the event detection
             GPIO.add_event_detect(self.BUTTON_PIN, GPIO.FALLING,
-                              callback=self.button_pressed_callback,
-                              bouncetime=300)
+                                  callback=self.button_pressed_callback,
+                                  bouncetime=300)
         except Exception:
             self.disabled = True
             print(f"Disabling LedControl because button event detection setup failed: {traceback.format_exc()}")
+            # Additional diagnostic information
+            print(f"Current GPIO function for BUTTON_PIN ({self.BUTTON_PIN}): {GPIO.gpio_function(self.BUTTON_PIN)}")
 
     def button_pressed_callback(self, channel):
         """Handle button press events"""
