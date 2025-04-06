@@ -31,6 +31,7 @@ class FreezerBotSetup:
         self.led_control.set_state("reset")
         time.sleep(2)
         subprocess.Popen(["/usr/bin/systemctl", "disable", "freezerbot-monitor.service"])
+        subprocess.Popen(["/usr/bin/systemctl", "stop", "freezerbot-monitor.service"])
         subprocess.Popen(["/usr/bin/systemctl", "enable", "freezerbot-setup.service"])
         subprocess.Popen(["/usr/bin/systemctl", "start", "freezerbot-setup.service"])
 
@@ -43,7 +44,8 @@ class FreezerBotSetup:
 
         subprocess.run(["/usr/bin/systemctl", "enable", "freezerbot-monitor.service"])
         subprocess.run(["/usr/bin/systemctl", "start", "freezerbot-monitor.service"])
-        subprocess.Popen(["/usr/bin/systemctl", "disable", "freezerbot-setup.service"])
+        subprocess.run(["/usr/bin/systemctl", "disable", "freezerbot-setup.service"])
+        subprocess.run(["/usr/bin/systemctl", "stop", "freezerbot-setup.service"])
 
     def setup_routes(self):
         """Set up the web routes for the configuration portal"""

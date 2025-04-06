@@ -16,11 +16,13 @@ def determine_mode():
     if config.is_configured:
         print('Configuration valid, starting freezerbot-monitor.service')
         subprocess.run(["sudo", "systemctl", "disable", "freezerbot-setup.service"])
+        subprocess.run(["sudo", "systemctl", "stop", "freezerbot-setup.service"])
         subprocess.run(["sudo", "systemctl", "enable", "freezerbot-monitor.service"])
         subprocess.run(["sudo", "systemctl", "restart", "freezerbot-monitor.service"])
     else:
         print('Configuration invalid, starting freezerbot-setup.service')
         subprocess.run(["sudo", "systemctl", "disable", "freezerbot-monitor.service"])
+        subprocess.run(["sudo", "systemctl", "stop", "freezerbot-monitor.service"])
         subprocess.run(["sudo", "systemctl", "enable", "freezerbot-setup.service"])
         subprocess.run(["sudo", "systemctl", "restart", "freezerbot-setup.service"])
 
