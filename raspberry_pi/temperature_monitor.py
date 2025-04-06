@@ -112,11 +112,11 @@ class TemperatureMonitor:
         # Main monitoring loop - continue indefinitely
         while True:
             try:
-                self.obtain_api_token()
-
-                temperature = self.read_temperature()
-
                 try:
+                    self.obtain_api_token()
+
+                    temperature = self.read_temperature()
+
                     payload = {
                         "degrees_c": temperature,
                         "cpu_degrees_c": CPUTemperature().temperature,
@@ -152,19 +152,15 @@ class TemperatureMonitor:
                 if len(self.consecutive_errors) > 0:
                     print(f'Consecutive errors: {len(self.consecutive_errors)}')
                     print("\n\n".join(self.consecutive_errors))
-                    response = make_api_request('sensors/reportError', json={
-                        'errors': self.consecutive_errors
-                    })
-
-                    if response.status_code == 200:
-                        self.consecutive_errors = []
+                    self.report_consecutive_errors()
 
                 time.sleep(60)
 
             except Exception as e:
-                print(f"Error in main loop: {str(e)}")
-                self.consecutive_errors.append(str(e))
+                print(f"Error in main loop: {traceback.format_exc()}")
+                self.consecutive_errors.append(traceback.format_exc())
                 self.led_control.set_state("error")
+                self.report_consecutive_errors()
                 time.sleep(5)
 
                 # Switch back to appropriate state based on connectivity
@@ -175,6 +171,14 @@ class TemperatureMonitor:
 
                 # Still wait before next attempt
                 time.sleep(30)
+
+    def report_consecutive_errors(self):
+        response = make_api_request('sensors/reportError', json={
+            'errors': self.consecutive_errors
+        })
+
+        if response.status_code == 200:
+            self.consecutive_errors = []
 
     def cleanup(self):
         """Clean up GPIO on exit"""
