@@ -30,10 +30,10 @@ class FreezerBotSetup:
         """Restart in setup mode - only used when button is explicitly held"""
         self.led_control.set_state("reset")
         time.sleep(2)
-        subprocess.Popen(["/usr/bin/systemctl", "disable", "freezerbot-monitor.service"])
-        subprocess.Popen(["/usr/bin/systemctl", "stop", "freezerbot-monitor.service"])
         subprocess.Popen(["/usr/bin/systemctl", "enable", "freezerbot-setup.service"])
         subprocess.Popen(["/usr/bin/systemctl", "start", "freezerbot-setup.service"])
+        subprocess.Popen(["/usr/bin/systemctl", "disable", "freezerbot-monitor.service"])
+        subprocess.Popen(["/usr/bin/systemctl", "stop", "freezerbot-monitor.service"])
 
     def restart_in_sensor_mode(self):
         # Re-enable NetworkManager control of wlan0
