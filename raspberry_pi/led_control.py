@@ -109,7 +109,8 @@ class LedControl:
                     print("Long press detected (10 seconds) - triggering reset")
                     button_pressed = False  # Reset so we don't trigger multiple times
                     self.set_state('reset')
-                    self.config.clear_config()
+                    # clear just the api token so we still have the current config to allow editing
+                    # the user will just have to re-enter their email/password
                     clear_api_token()
                     restart_in_setup_mode()
 
