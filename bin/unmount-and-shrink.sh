@@ -38,8 +38,6 @@ echo "Applying PiShrink to image file..."
 echo "Input: $IMAGE_FILE"
 echo "Output: $OUTPUT_FILE"
 
-ensure_pishrink
-
 "$SCRIPT_DIR/shrink-image.sh" "$IMAGE_FILE" "$OUTPUT_FILE"
 
 echo "Done! Shrunk image saved as: $OUTPUT_FILE"

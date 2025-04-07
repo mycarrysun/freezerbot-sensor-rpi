@@ -119,10 +119,11 @@ rm -rf "$MOUNT_POINT/$PI_DIR/freezerbot-backups/"*
 
 # Remove NetworkManager connections (WiFi configurations)
 rm -f "$MOUNT_POINT/etc/NetworkManager/system-connections/"*
+rm -rf "$MOUNT_POINT/etc/ssl/certs/freezerbot-"*
 
 # Clean systemd files that are created outside the repo
-rm -f "$MOUNT_POINT/etc/systemd/system/freezerbot-*"
-rm -f "$MOUNT_POINT/etc/systemd/system/*/freezerbot-*"
+rm -f "$MOUNT_POINT/etc/systemd/system/freezerbot-"*
+rm -f "$MOUNT_POINT"/etc/systemd/system/*/freezerbot-*
 
 # Remove hostapd and dnsmasq configs
 rm -f "$MOUNT_POINT/etc/hostapd/hostapd.conf"
