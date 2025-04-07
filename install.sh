@@ -11,11 +11,6 @@ fi
 
 echo "Beginning Freezerbot installation..."
 
-# Install system packages
-echo "Installing system packages..."
-apt-get update
-apt-get install -y python3-venv python3-pip git hostapd dnsmasq
-
 # Create directory structure
 echo "Setting up directory structure..."
 PI_DIR=/home/pi
