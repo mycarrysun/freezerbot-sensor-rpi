@@ -1,7 +1,20 @@
 import os
 import json
+import subprocess
 
 from api import api_token_exists
+
+def clear_nm_connections():
+    connections = subprocess.run(
+        ["/usr/bin/nmcli", "-t", "-f", "NAME,TYPE", "connection", "show"],
+        capture_output=True, text=True
+    ).stdout.strip().split('\n')
+
+    for conn in connections:
+        if ':wifi' in conn:
+            conn_name = conn.split(':')[0]
+            subprocess.run(["/usr/bin/nmcli", "connection", "delete", conn_name],
+                           stderr=subprocess.DEVNULL)
 
 class Config:
     def __init__(self, filename='config.json'):

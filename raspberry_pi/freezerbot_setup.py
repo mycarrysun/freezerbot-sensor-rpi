@@ -5,7 +5,7 @@ from time import sleep
 import RPi.GPIO as GPIO
 from flask import Flask, request, render_template, redirect, jsonify
 
-from config import Config
+from config import Config, clear_nm_connections
 from led_control import LedControl
 from restarts import restart_in_sensor_mode
 
@@ -119,16 +119,7 @@ class FreezerBotSetup:
         }
 
         # Delete all existing WiFi connections
-        connections = subprocess.run(
-            ["/usr/bin/nmcli", "-t", "-f", "NAME,TYPE", "connection", "show"],
-            capture_output=True, text=True
-        ).stdout.strip().split('\n')
-
-        for conn in connections:
-            if ':wifi' in conn:
-                conn_name = conn.split(':')[0]
-                subprocess.run(["/usr/bin/nmcli", "connection", "delete", conn_name],
-                               stderr=subprocess.DEVNULL)
+        clear_nm_connections()
 
         for i, network in enumerate(networks):
             ssid = network.get('ssid')
@@ -158,10 +149,12 @@ class FreezerBotSetup:
                 print(f"Adding enterprise WiFi network: {ssid}")
 
                 # Identify if CA cert is needed and where it should be installed
-                ca_cert_path = ""
-                if ssid.lower() == 'eduroam':
-                    # For eduroam, we use the built-in Lets Encrypt CA which is trusted
-                    ca_cert_path = "/etc/ssl/certs/ca-certificates.crt"
+                ca_cert_path = "/etc/ssl/certs/ca-certificates.crt"
+                ca_cert_contents = network.get('ca_cert_content', None)
+                if ca_cert_contents is not None:
+                    ca_cert_path = '/etc/ssl/certs/freezerbot-' + ssid.replace(' ', '-') + '.crt'
+                    with open(ca_cert_path, 'w') as file:
+                        file.write(ca_cert_contents)
 
                 # Build the nmcli command for enterprise WiFi
                 enterprise_cmd = [
@@ -181,11 +174,6 @@ class FreezerBotSetup:
                     "802-1x.password", password
                 ])
 
-                # Add anonymous identity for eduroam if domain suffix available
-                if 'domain_suffix' in network_defaults:
-                    anon_identity = f"anonymous@{network_defaults['domain_suffix']}"
-                    enterprise_cmd.extend(["802-1x.anonymous-identity", anon_identity])
-
                 # Add CA cert if available
                 if ca_cert_path:
                     enterprise_cmd.extend(["802-1x.ca-cert", ca_cert_path])
@@ -193,7 +181,6 @@ class FreezerBotSetup:
                 # Add autoconnect settings
                 enterprise_cmd.extend([
                     "autoconnect", "yes",
-                    "autoconnect-priority", str(priority + 10)
                 ])
 
                 # Execute the command
