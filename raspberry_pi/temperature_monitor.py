@@ -161,7 +161,10 @@ class TemperatureMonitor:
                 print(f"Error in main loop: {traceback.format_exc()}")
                 self.consecutive_errors.append(traceback.format_exc())
                 self.led_control.set_state("error")
-                self.report_consecutive_errors()
+                try:
+                    self.report_consecutive_errors()
+                except Exception:
+                    print(f'Error when sending logs: {traceback.format_exc()}')
                 time.sleep(5)
 
                 # Switch back to appropriate state based on connectivity
