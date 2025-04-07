@@ -8,6 +8,7 @@ import traceback
 
 from dotenv import load_dotenv
 
+from api import clear_api_token
 from restarts import restart_in_setup_mode
 from config import Config
 
@@ -108,6 +109,7 @@ class LedControl:
                     print("Long press detected (10 seconds) - triggering reset")
                     button_pressed = False  # Reset so we don't trigger multiple times
                     self.config.clear_config()
+                    clear_api_token()
                     restart_in_setup_mode()
 
                 # Small sleep to prevent CPU hogging

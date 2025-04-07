@@ -1,6 +1,6 @@
 import os
 import requests
-from dotenv import load_dotenv, set_key
+from dotenv import load_dotenv, set_key, unset_key
 
 API_TOKEN = 'API_TOKEN'
 API_HOST = 'FREEZERBOT_API_HOST'
@@ -33,3 +33,6 @@ def api_token_exists():
         return True
     else:
         return False
+
+def clear_api_token():
+    unset_key('.env', API_TOKEN)
