@@ -361,6 +361,7 @@ class FirmwareUpdater:
         success = self.apply_update(backup_path)
 
         if success:
+            subprocess.run(["/usr/bin/sudo", "/usr/bin/rm", "-rf", self.backup_directory])
             self.logger.info("Firmware update completed successfully")
         else:
             self.logger.error('Firmware update failed')
