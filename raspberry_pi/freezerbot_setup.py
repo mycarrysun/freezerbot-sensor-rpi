@@ -290,7 +290,7 @@ address=/#/192.168.4.1
 
     def run(self):
         """Main entry point"""
-        if not self.config.is_configured:
+        if not self.config.configuration_exists or not self.config.is_configured:
             # Set LED to blinking
             self.led_control.set_state("setup")
 
