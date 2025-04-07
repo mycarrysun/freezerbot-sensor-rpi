@@ -108,6 +108,7 @@ class LedControl:
                 elif button_pressed and time.time() - press_start_time > 10:
                     print("Long press detected (10 seconds) - triggering reset")
                     button_pressed = False  # Reset so we don't trigger multiple times
+                    self.set_state('reset')
                     self.config.clear_config()
                     clear_api_token()
                     restart_in_setup_mode()

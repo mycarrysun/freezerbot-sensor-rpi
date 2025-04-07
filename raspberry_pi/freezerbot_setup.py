@@ -106,6 +106,7 @@ class FreezerBotSetup:
 
             return jsonify({"success": True})
         except Exception as e:
+            self.led_control.set_state('error')
             return jsonify({"success": False, "error": str(e)})
 
     def captive_portal_redirect(self):
@@ -273,6 +274,7 @@ address=/#/192.168.4.1
                                         capture_output=True, text=True).stdout.strip()
 
         if hostapd_status != "active" or dnsmasq_status != "active":
+            self.led_control.set_state('error')
             raise Exception(f"Failed to start services: hostapd={hostapd_status}, dnsmasq={dnsmasq_status}")
 
     def run(self):
