@@ -15,6 +15,7 @@ from api import make_api_request, api_token_exists, set_api_token, make_api_requ
 from freezerbot_setup import FreezerBotSetup
 from config import Config
 from pisugar import PiSugarMonitor
+from network import test_internet_connectivity
 from restarts import restart_in_setup_mode
 
 
@@ -96,23 +97,40 @@ class TemperatureMonitor:
         degrees_c = sensor.get_temperature()
         return degrees_c
 
-    def connected_to_wifi(self):
-        nm_status = subprocess.run(
-            ["/usr/bin/nmcli", "-t", "-f", "DEVICE,STATE", "device", "status"],
-            capture_output=True, text=True
-        ).stdout.strip()
-
-        return 'wlan0:connected' in nm_status
-
     def run(self):
         """Main monitoring loop with resilient error handling"""
         print("Starting temperature monitoring")
 
         self.led_control.set_state("running")
+        network_failure_count = 0
+        api_failure_count = 0
+        recovery_attempted = False
 
         # Main monitoring loop - continue indefinitely
         while True:
             try:
+                # Test actual internet connectivity, not just WiFi connection
+                internet_connected = test_internet_connectivity()
+
+                if not internet_connected:
+                    self.led_control.set_state("wifi_issue")
+                    network_failure_count += 1
+
+                    # Network recovery logic with escalating actions
+                    if network_failure_count >= 3 and not recovery_attempted:
+                        subprocess.run(["/usr/bin/systemctl", "restart", "NetworkManager.service"])
+                        recovery_attempted = True
+                    elif network_failure_count >= 10:
+                        print("Critical network failure, performing system reboot")
+                        subprocess.run(["/usr/bin/systemctl", "reboot", "-i"])
+
+                    time.sleep(60)
+                    continue
+
+                # Reset network failure counter if we have internet
+                network_failure_count = 0
+                recovery_attempted = False
+
                 try:
                     self.obtain_api_token()
 
@@ -134,21 +152,25 @@ class TemperatureMonitor:
 
                     if response.status_code == 201:
                         print('Successfully sent reading')
-                        self.consecutive_errors = []
                         self.led_control.set_state('running')
+                        self.report_consecutive_errors()
+                        api_failure_count = 0
                     else:
-                        self.led_control.set_state("error")
+                        api_failure_count += 1
                         self.consecutive_errors.append(f'API error: {response.status_code} - {response.text}')
 
-                except requests.exceptions.RequestException as e:
-                    # Network error
-                    print(f"Network error sending data: {str(e)}")
-                    self.led_control.set_state("wifi_issue")
-                    self.consecutive_errors.append(traceback.format_exc())
+                        # Only change LED state after persistent API failures
+                        if api_failure_count >= 3:
+                            self.led_control.set_state("error")
+
                 except Exception as e:
-                    print(f"Error sending data: {str(e)}")
-                    self.led_control.set_state("error")
+                    print(f"Error in API communication: {traceback.format_exc()}")
                     self.consecutive_errors.append(traceback.format_exc())
+                    api_failure_count += 1
+
+                    # Only change LED state after persistent API failures
+                    if api_failure_count >= 3:
+                        self.led_control.set_state("error")
 
                 if len(self.consecutive_errors) > 0:
                     print(f'Consecutive errors: {len(self.consecutive_errors)}')
@@ -162,19 +184,10 @@ class TemperatureMonitor:
                 self.consecutive_errors.append(traceback.format_exc())
                 self.led_control.set_state("error")
                 try:
+
                     self.report_consecutive_errors()
                 except Exception:
                     print(f'Error when sending logs: {traceback.format_exc()}')
-                time.sleep(5)
-
-                # Switch back to appropriate state based on connectivity
-                if self.connected_to_wifi():
-                    self.led_control.set_state("running")
-                else:
-                    self.led_control.set_state("wifi_issue")
-
-                # Still wait before next attempt
-                time.sleep(30)
 
     def report_consecutive_errors(self):
         response = make_api_request('sensors/reportError', json={
