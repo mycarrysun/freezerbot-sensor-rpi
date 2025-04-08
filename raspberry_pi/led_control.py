@@ -1,4 +1,5 @@
 import os
+import subprocess
 
 import RPi.GPIO as GPIO
 import time
@@ -85,6 +86,7 @@ class LedControl:
         print("Starting button polling thread")
         button_pressed = False
         press_start_time = 0
+        two_second_mark_reached = False
 
         while self.running and not self.button_disabled:
             try:
@@ -96,7 +98,25 @@ class LedControl:
                 if current_state == GPIO.LOW and not button_pressed:
                     button_pressed = True
                     press_start_time = time.time()
+                    two_second_mark_reached = False
                     print("Button pressed")
+
+                # Button still pressed - check for 2 second mark
+                elif current_state == GPIO.LOW and button_pressed and not two_second_mark_reached and time.time() - press_start_time > 2:
+                    print("2 second press detected - preparing for reboot")
+                    two_second_mark_reached = True
+                    self.signal_reboot_preparation()
+
+                # Check for long press while button is still pressed
+                elif current_state == GPIO.LOW and button_pressed and time.time() - press_start_time > 10:
+                    print("Long press detected (10 seconds) - triggering reset")
+                    button_pressed = False  # Reset so we don't trigger multiple times
+                    two_second_mark_reached = False
+                    self.signal_reset_mode()
+                    # clear just the api token so we still have the current config to allow editing
+                    # the user will just have to re-enter their email/password
+                    clear_api_token()
+                    restart_in_setup_mode()
 
                 # Button released
                 elif current_state == GPIO.HIGH and button_pressed:
@@ -104,21 +124,18 @@ class LedControl:
                     duration = time.time() - press_start_time
                     print(f"Button released after {duration:.1f} seconds")
 
-                # Check for long press while button is still pressed
-                elif button_pressed and time.time() - press_start_time > 10:
-                    print("Long press detected (10 seconds) - triggering reset")
-                    button_pressed = False  # Reset so we don't trigger multiple times
-                    self.set_state('reset')
-                    # clear just the api token so we still have the current config to allow editing
-                    # the user will just have to re-enter their email/password
-                    clear_api_token()
-                    restart_in_setup_mode()
+                    # If we have passed the 2 second mark but not the 10 second mark, reboot
+                    if two_second_mark_reached and duration < 10:
+                        print("Rebooting system...")
+                        self.reboot_system()
+
+                    two_second_mark_reached = False
 
                 # Small sleep to prevent CPU hogging
                 time.sleep(0.1)
 
             except Exception as e:
-                print(f"Error in button polling: {str(e)}")
+                print(f"Error in button polling: {traceback.format_exc()}")
                 time.sleep(1)  # Longer sleep on error
 
     def set_state(self, state):
@@ -180,6 +197,51 @@ class LedControl:
             # Longer pause
             time.sleep(1.0)
 
+    def signal_reboot_preparation(self):
+        """Visual indication that the system is preparing to reboot (2 blinks)"""
+        if self.module_disabled or self.led_disabled:
+            return
+
+        # Store the current state
+        previous_state = self.current_state
+
+        # Stop any current patterns
+        self.stop_pattern_thread()
+
+        # Blink twice to indicate reboot preparation
+        if self.pwm:
+            self.pwm.stop()
+            self.pwm = None
+
+        for _ in range(2):
+            GPIO.output(self.LED_PIN, GPIO.HIGH)
+            time.sleep(0.2)
+            GPIO.output(self.LED_PIN, GPIO.LOW)
+            time.sleep(0.2)
+
+        # Restore previous state
+        if previous_state:
+            self.set_state(previous_state)
+
+    def signal_reset_mode(self):
+        """Visual indication that the system is resetting to setup mode (5 blinks)"""
+        if self.module_disabled or self.led_disabled:
+            return
+
+        # Stop any current patterns
+        self.stop_pattern_thread()
+
+        # Blink 5 times to indicate reset to setup mode
+        if self.pwm:
+            self.pwm.stop()
+            self.pwm = None
+
+        for _ in range(5):
+            GPIO.output(self.LED_PIN, GPIO.LOW)
+            time.sleep(0.2)
+            GPIO.output(self.LED_PIN, GPIO.HIGH)
+            time.sleep(0.2)
+
     def start_pattern_thread(self, pattern_function):
         """Start a thread to run a custom LED pattern"""
         if self.module_disabled:
@@ -199,6 +261,13 @@ class LedControl:
             self.current_state = None
             self.pattern_thread.join(timeout=0.5)
             self.pattern_thread = None
+
+    def reboot_system(self):
+        """Reboot the system"""
+        try:
+            subprocess.run(["/usr/bin/sudo", "/usr/sbin/reboot"], check=True)
+        except Exception as e:
+            print(f"Error rebooting system: {traceback.format_exc()}")
 
     def cleanup(self):
         """Clean up resources"""
