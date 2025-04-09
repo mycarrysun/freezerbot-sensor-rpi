@@ -169,16 +169,6 @@ class LedControl:
         elif state == "wifi_issue":
             # Double-blink pattern for WiFi connectivity issues
             self.start_pattern_thread(self.wifi_issue_pattern)
-        elif state == "reset":
-            # Three quick flashes
-            if self.pwm:
-                self.pwm.stop()
-                self.pwm = None
-            for _ in range(3):
-                GPIO.output(self.LED_PIN, GPIO.HIGH)
-                time.sleep(0.2)
-                GPIO.output(self.LED_PIN, GPIO.LOW)
-                time.sleep(0.2)
 
     def wifi_issue_pattern(self):
         """LED pattern for WiFi connectivity issues: double-blink with pause"""
@@ -215,9 +205,11 @@ class LedControl:
 
         for _ in range(2):
             GPIO.output(self.LED_PIN, GPIO.HIGH)
-            time.sleep(0.2)
+            time.sleep(0.1)
             GPIO.output(self.LED_PIN, GPIO.LOW)
-            time.sleep(0.2)
+            time.sleep(0.1)
+
+        time.sleep(3)
 
         # Restore previous state
         if previous_state:
@@ -237,9 +229,9 @@ class LedControl:
             self.pwm = None
 
         for _ in range(5):
-            GPIO.output(self.LED_PIN, GPIO.LOW)
-            time.sleep(0.2)
             GPIO.output(self.LED_PIN, GPIO.HIGH)
+            time.sleep(0.2)
+            GPIO.output(self.LED_PIN, GPIO.LOW)
             time.sleep(0.2)
 
     def start_pattern_thread(self, pattern_function):
