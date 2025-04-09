@@ -234,6 +234,32 @@ class LedControl:
             GPIO.output(self.LED_PIN, GPIO.LOW)
             time.sleep(0.2)
 
+    def signal_successful_transmission(self):
+        """Visual indication that a temperature reading was successfully sent (2 fast blinks)"""
+        if self.module_disabled or self.led_disabled:
+            return
+
+        # Store the current state
+        previous_state = self.current_state
+
+        # Stop any current patterns
+        self.stop_pattern_thread()
+
+        # Blink twice very quickly to indicate successful transmission
+        if self.pwm:
+            self.pwm.stop()
+            self.pwm = None
+
+        for _ in range(2):
+            GPIO.output(self.LED_PIN, GPIO.HIGH)
+            time.sleep(0.05)  # Very short on time (50ms)
+            GPIO.output(self.LED_PIN, GPIO.LOW)
+            time.sleep(0.05)  # Very short off time (50ms)
+
+        # Restore previous state
+        if previous_state:
+            self.set_state(previous_state)
+
     def start_pattern_thread(self, pattern_function):
         """Start a thread to run a custom LED pattern"""
         if self.module_disabled:

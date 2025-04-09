@@ -190,6 +190,7 @@ class TemperatureMonitor:
 
                     if response.status_code == 201:
                         print('Successfully sent reading')
+                        self.led_control.signal_successful_transmission()
                         self.led_control.set_state('running')
                         self.report_consecutive_errors()
                         api_failure_count = 0
