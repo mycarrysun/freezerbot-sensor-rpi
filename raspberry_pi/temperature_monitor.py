@@ -15,7 +15,7 @@ from api import make_api_request, api_token_exists, set_api_token, make_api_requ
 from freezerbot_setup import FreezerBotSetup
 from config import Config
 from pisugar import PiSugarMonitor
-from network import test_internet_connectivity
+from network import test_internet_connectivity, load_network_status, save_network_status, reset_network_status
 from restarts import restart_in_setup_mode
 
 
@@ -102,9 +102,13 @@ class TemperatureMonitor:
         print("Starting temperature monitoring")
 
         self.led_control.set_state("running")
-        network_failure_count = 0
-        api_failure_count = 0
+        network_status = load_network_status()
+        network_failure_count = network_status.get('network_failure_count', 0)
+        reboot_count = network_status.get('reboot_count', 0)
         recovery_attempted = False
+        api_failure_count = 0
+
+        print(f"Starting with network_failure_count: {network_failure_count}, reboot_count: {reboot_count}")
 
         # Main monitoring loop - continue indefinitely
         while True:
@@ -116,19 +120,53 @@ class TemperatureMonitor:
                     self.led_control.set_state("wifi_issue")
                     network_failure_count += 1
 
+                    # Save updated failure count immediately
+                    network_status['network_failure_count'] = network_failure_count
+                    save_network_status(network_status)
+
+                    print(f"Network failure #{network_failure_count}, reboot_count: {reboot_count}")
+
                     # Network recovery logic with escalating actions
                     if network_failure_count >= 3 and not recovery_attempted:
+                        print("Attempting network recovery by restarting NetworkManager")
                         subprocess.run(["/usr/bin/systemctl", "restart", "NetworkManager.service"])
                         recovery_attempted = True
-                    elif network_failure_count >= 10:
-                        print("Critical network failure, performing system reboot")
-                        subprocess.run(["/usr/bin/systemctl", "reboot", "-i"])
+                    elif network_failure_count >= 10 and reboot_count < 2:
+                        print(
+                            f"Critical network failure (failure: {network_failure_count}, reboots: {reboot_count}), performing system reboot")
+                        # Increment reboot count before reboot
+                        reboot_count += 1
+                        network_status['reboot_count'] = reboot_count
+                        save_network_status(network_status)
 
-                    time.sleep(60)
+                        # Report critical network failure to API if possible
+                        try:
+                            self.consecutive_errors.append(
+                                f"Critical network failure triggering reboot #{reboot_count}. Total failures: {network_failure_count}")
+                            self.report_consecutive_errors()
+                        except Exception:
+                            print("Failed to report network failure before reboot")
+
+                        subprocess.run(["/usr/bin/systemctl", "reboot", "-i"])
+                    elif network_failure_count >= 10 and reboot_count >= 2:
+                        print(
+                            f"Excessive network failures ({network_failure_count}) after {reboot_count} reboots. Continuing to monitor without further reboots.")
+                        # Add to consecutive errors but don't reboot
+                        if len(self.consecutive_errors) == 0 or "Excessive network failures" not in \
+                                self.consecutive_errors[-1]:
+                            self.consecutive_errors.append(
+                                f"Excessive network failures ({network_failure_count}) after {reboot_count} reboots. Continuing without further reboots.")
+
                     continue
 
                 # Reset network failure counter if we have internet
-                network_failure_count = 0
+                if network_failure_count > 0:
+                    print(
+                        f"Network connectivity restored after {network_failure_count} failures and {reboot_count} reboots")
+                    network_failure_count = 0
+                    reboot_count = 0
+                    reset_network_status()
+
                 recovery_attempted = False
 
                 try:
@@ -177,17 +215,17 @@ class TemperatureMonitor:
                     print("\n\n".join(self.consecutive_errors))
                     self.report_consecutive_errors()
 
-                time.sleep(60)
-
             except Exception as e:
                 print(f"Error in main loop: {traceback.format_exc()}")
                 self.consecutive_errors.append(traceback.format_exc())
                 self.led_control.set_state("error")
                 try:
-
                     self.report_consecutive_errors()
                 except Exception:
                     print(f'Error when sending logs: {traceback.format_exc()}')
+
+            finally:
+                time.sleep(60)
 
     def report_consecutive_errors(self):
         response = make_api_request('sensors/reportError', json={
