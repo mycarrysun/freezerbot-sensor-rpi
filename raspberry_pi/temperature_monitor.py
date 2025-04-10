@@ -239,6 +239,8 @@ class TemperatureMonitor:
 
         if response.status_code == 200:
             self.consecutive_errors = []
+        else:
+            print(f'Error reporting errors: {response.status_code} - {response.text}')
 
     def cleanup(self):
         """Clean up GPIO on exit"""
