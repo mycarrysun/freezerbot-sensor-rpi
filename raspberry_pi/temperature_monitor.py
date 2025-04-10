@@ -202,6 +202,11 @@ class TemperatureMonitor:
                         if api_failure_count >= 3:
                             self.led_control.set_state("error")
 
+                except NoSensorFoundError as e:
+                    print(f'No sensor found: {traceback.format_exc()}')
+                    self.consecutive_errors.append(traceback.format_exc())
+                    self.led_control.set_state('error')
+
                 except Exception as e:
                     print(f"Error in API communication: {traceback.format_exc()}")
                     self.consecutive_errors.append(traceback.format_exc())
