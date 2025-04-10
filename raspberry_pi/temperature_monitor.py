@@ -101,7 +101,6 @@ class TemperatureMonitor:
         """Main monitoring loop with resilient error handling"""
         print("Starting temperature monitoring")
 
-        self.led_control.set_state("running")
         network_status = load_network_status()
         network_failure_count = network_status.get('network_failure_count', 0)
         reboot_count = network_status.get('reboot_count', 0)
