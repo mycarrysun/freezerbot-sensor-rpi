@@ -29,6 +29,9 @@ class TemperatureMonitor:
         self.led_control = LedControl()
         self.freezerbot_setup = FreezerBotSetup()
         self.pisugar = PiSugarMonitor()
+        self.sensor = None
+        self.consecutive_sensor_errors = 0
+        self.max_errors_before_sensor_reset = 3
 
         self.validate_config()
 
@@ -83,13 +86,39 @@ class TemperatureMonitor:
         else:
             print('Api already token exists')
 
-
     def read_temperature(self):
-        """Read temperature from sensor"""
+        """Read temperature with escalating recovery methods"""
         print('Reading temperature')
-        sensor = W1ThermSensor()
-        degrees_c = sensor.get_temperature()
-        return degrees_c
+
+        if self.sensor is None:
+            try:
+                self.sensor = W1ThermSensor()
+            except Exception as e:
+                self.consecutive_errors.append(f'Error creating sensor instance: {traceback.format_exc()}')
+                raise
+
+        if self.consecutive_sensor_errors >= self.max_errors_before_sensor_reset:
+            print(f"Resetting 1-Wire modules after {self.consecutive_sensor_errors} failures")
+            try:
+                subprocess.run(["/usr/bin/modprobe", "-r", "w1_gpio", "w1_therm"])
+                time.sleep(1)
+                subprocess.run(["/usr/bin/modprobe", "w1_gpio", "w1_therm"])
+                time.sleep(2)  # Give system time to detect sensors
+
+                self.sensor = W1ThermSensor()
+            except Exception as e:
+                self.consecutive_errors.append(f"Error after module reset: {traceback.format_exc()}")
+                raise
+
+        if self.sensor is not None:
+            try:
+                temperature = self.sensor.get_temperature()
+                self.consecutive_sensor_errors = 0
+                return temperature
+            except Exception as e:
+                self.consecutive_sensor_errors += 1
+                self.consecutive_errors.append(f"Error reading from existing sensor: {traceback.format_exc()}")
+                raise
 
     def run(self):
         """Main monitoring loop with resilient error handling"""
