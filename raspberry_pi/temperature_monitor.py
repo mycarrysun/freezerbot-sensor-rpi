@@ -2,12 +2,12 @@ import os
 import time
 import json
 import traceback
+from pydoc import classname
 
-import requests
 import RPi.GPIO as GPIO
 import subprocess
 from led_control import LedControl
-from w1thermsensor import W1ThermSensor, NoSensorFoundError
+from w1thermsensor import W1ThermSensor, NoSensorFoundError, SensorNotReadyError
 from datetime import datetime
 from gpiozero import CPUTemperature
 
@@ -87,13 +87,7 @@ class TemperatureMonitor:
     def read_temperature(self):
         """Read temperature from sensor"""
         print('Reading temperature')
-        try:
-            sensor = W1ThermSensor()
-        except NoSensorFoundError as e:
-            make_api_request('sensors/reportError', json={
-                'errors': [traceback.format_exc()]
-            })
-            raise
+        sensor = W1ThermSensor()
         degrees_c = sensor.get_temperature()
         return degrees_c
 
@@ -201,8 +195,8 @@ class TemperatureMonitor:
                         if api_failure_count >= 3:
                             self.led_control.set_state("error")
 
-                except NoSensorFoundError as e:
-                    print(f'No sensor found: {traceback.format_exc()}')
+                except NoSensorFoundError or SensorNotReadyError as e:
+                    print(f'{classname(e, "")}: {traceback.format_exc()}')
                     self.consecutive_errors.append(traceback.format_exc())
                     self.led_control.set_state('error')
 
@@ -233,7 +227,7 @@ class TemperatureMonitor:
                 time.sleep(60)
 
     def report_consecutive_errors(self):
-        response = make_api_request('sensors/reportError', json={
+        response = make_api_request('sensors/errors', json={
             'errors': self.consecutive_errors
         })
 
