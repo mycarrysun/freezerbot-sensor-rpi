@@ -15,11 +15,30 @@ from config import Config
 
 LED_CONTROL_DISABLED = 'LED_DISABLED'
 
+
 class LedControl:
-    """Class for controlling the button's built-in LED"""
+    """Class for controlling the button's built-in LED with singleton pattern"""
+
+    # Class variable to track the single instance
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        """Ensure only one instance of LedControl exists"""
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super(LedControl, cls).__new__(cls)
+                cls._instance._initialized = False
+            return cls._instance
 
     def __init__(self):
         """Initialize the LED control with the specified pin"""
+        # Skip initialization if already done
+        if self._initialized:
+            return
+
+        self._initialized = True
+
         load_dotenv(override=True)
         self.module_disabled = os.getenv(LED_CONTROL_DISABLED) == 'true'
         self.led_disabled = False
@@ -32,18 +51,23 @@ class LedControl:
         self.pwm = None
         self.running = False
         self.current_state = None
+        self.button_thread = None
+
+        # Action trigger flags
+        self.reboot_triggered = False
+        self.setup_mode_triggered = False
+        self.factory_reset_triggered = False
+
+        # Ensure we're starting with a clean state
+        self.cleanup()
 
         # Initialize GPIO
-        try:
-            # Clean any previous setup
-            GPIO.cleanup()
-        except:
-            pass
-
         GPIO.setmode(GPIO.BCM)
 
         self.setup_led()
         self.setup_button()
+
+        print("LedControl initialized - ID: " + str(id(self)))
 
     def setup_led(self):
         """Set up the LED pin separately from button"""
@@ -72,10 +96,16 @@ class LedControl:
 
             # Start a separate thread to poll the button state instead of using event detection
             self.running = True
+
+            # Make sure we don't have an existing thread running
+            if self.button_thread is not None and self.button_thread.is_alive():
+                print("Button thread already running - not starting a new one")
+                return
+
             self.button_thread = threading.Thread(target=self.poll_button_state)
             self.button_thread.daemon = True
             self.button_thread.start()
-            print(f"Button pin {self.BUTTON_PIN} configured in polling mode")
+            print(f"Button pin {self.BUTTON_PIN} configured in polling mode - Thread ID: {self.button_thread.ident}")
         except Exception as e:
             print(f"Button setup failed: {traceback.format_exc()}")
             print("Button functionality will be disabled")
@@ -83,19 +113,14 @@ class LedControl:
 
     def poll_button_state(self):
         """Poll the button state instead of using event detection"""
-        print("Starting button polling thread")
+        thread_id = threading.get_ident()
+        print(f"Starting button polling thread - Thread ID: {thread_id}")
+
         button_pressed = False
         press_start_time = 0
         two_second_mark_reached = False
         ten_second_mark_reached = False
         thirty_second_mark_reached = False
-
-        last_state_change_time = 0
-        debounce_time = 0.05  # 50ms debounce
-
-        reboot_triggered = False
-        setup_mode_triggered = False
-        factory_reset_triggered = False
 
         while self.running and not self.button_disabled:
             try:
@@ -111,68 +136,58 @@ class LedControl:
                 current_time = time.time()
                 current_state = GPIO.input(self.BUTTON_PIN)
 
-                # Only process state changes after debounce time has passed
-                if current_time - last_state_change_time < debounce_time:
-                    time.sleep(0.01)  # Short sleep to prevent CPU hogging
-                    continue
-
                 # Button pressed (LOW when pressed with pull-up resistor)
                 if current_state == GPIO.LOW and not button_pressed:
                     button_pressed = True
-                    press_start_time = current_time
-                    last_state_change_time = current_time
+                    press_start_time = time.time()
                     two_second_mark_reached = False
                     ten_second_mark_reached = False
                     thirty_second_mark_reached = False
-                    reboot_triggered = False
-                    setup_mode_triggered = False
-                    factory_reset_triggered = False
-                    print("Button pressed")
+                    self.reboot_triggered = False
+                    self.setup_mode_triggered = False
+                    self.factory_reset_triggered = False
+                    print(f"[Thread {thread_id}] Button pressed")
 
                 # Button still pressed - check for 2 second mark
-                elif current_state == GPIO.LOW and button_pressed:
-                    hold_duration = current_time - press_start_time
+                elif current_state == GPIO.LOW and button_pressed and not two_second_mark_reached and time.time() - press_start_time > 2:
+                    print(f"[Thread {thread_id}] 2 second press detected - preparing for reboot")
+                    two_second_mark_reached = True
+                    self.signal_reboot_preparation()
 
-                    if not two_second_mark_reached and hold_duration > 2:
-                        print("2 second press detected - preparing for reboot")
-                        two_second_mark_reached = True
-                        self.signal_reboot_preparation()
+                # Check for 10 second press while button is still pressed
+                elif current_state == GPIO.LOW and button_pressed and not ten_second_mark_reached and time.time() - press_start_time > 10:
+                    print(f"[Thread {thread_id}] Long press detected (10 seconds) - preparing for reset mode")
+                    ten_second_mark_reached = True
+                    self.signal_reset_mode()
 
-                    # Check for 10 second press while button is still pressed
-                    elif not ten_second_mark_reached and hold_duration > 10:
-                        print("Long press detected (10 seconds) - preparing for reset mode")
-                        ten_second_mark_reached = True
-                        self.signal_reset_mode()
-
-                    # Check for 30 second press while button is still pressed
-                    elif not thirty_second_mark_reached and hold_duration > 30:
-                        print("Extra long press detected (30 seconds) - preparing for factory reset")
-                        thirty_second_mark_reached = True
-                        self.signal_factory_reset()
+                # Check for 30 second press while button is still pressed
+                elif current_state == GPIO.LOW and button_pressed and not thirty_second_mark_reached and time.time() - press_start_time > 30:
+                    print(f"[Thread {thread_id}] Extra long press detected (30 seconds) - preparing for factory reset")
+                    thirty_second_mark_reached = True
+                    self.signal_factory_reset()
 
                 # Button released
                 elif current_state == GPIO.HIGH and button_pressed:
                     button_pressed = False
-                    last_state_change_time = current_time
-                    duration = current_time - press_start_time
-                    print(f"Button released after {duration:.1f} seconds")
+                    duration = time.time() - press_start_time
+                    print(f"[Thread {thread_id}] Button released after {duration:.1f} seconds")
 
-                    if thirty_second_mark_reached and not factory_reset_triggered:
-                        print("Factory resetting system...")
-                        factory_reset_triggered = True
+                    if thirty_second_mark_reached and not self.factory_reset_triggered:
+                        print(f"[Thread {thread_id}] Factory resetting system...")
+                        self.factory_reset_triggered = True
                         self.perform_factory_reset()
                     # If we have passed the 10 second mark but not the 30 second mark, reset to setup mode
-                    elif ten_second_mark_reached and duration < 30 and not setup_mode_triggered:
-                        print("Resetting to setup mode...")
-                        setup_mode_triggered = True
+                    elif ten_second_mark_reached and duration < 30 and not self.setup_mode_triggered:
+                        print(f"[Thread {thread_id}] Resetting to setup mode...")
+                        self.setup_mode_triggered = True
                         # clear just the api token so we still have the current config to allow editing
                         # the user will just have to re-enter their email/password
                         clear_api_token()
                         restart_in_setup_mode()
                     # If we have passed the 2 second mark but not the 10 second mark, reboot
-                    elif two_second_mark_reached and duration < 10 and not reboot_triggered:
-                        print("Rebooting system...")
-                        reboot_triggered = True
+                    elif two_second_mark_reached and duration < 10 and not self.reboot_triggered:
+                        print(f"[Thread {thread_id}] Rebooting system...")
+                        self.reboot_triggered = True
                         self.reboot_system()
 
                     two_second_mark_reached = False
@@ -183,8 +198,10 @@ class LedControl:
                 time.sleep(0.1)
 
             except Exception as e:
-                print(f"Error in button polling: {traceback.format_exc()}")
+                print(f"[Thread {thread_id}] Error in button polling: {traceback.format_exc()}")
                 time.sleep(1)  # Longer sleep on error
+
+        print(f"[Thread {thread_id}] Button polling thread exiting")
 
     def set_state(self, state):
         """Set the LED to different states based on mode"""
@@ -404,13 +421,20 @@ class LedControl:
     def cleanup(self):
         """Clean up resources"""
         self.running = False
-        if hasattr(self, 'button_thread') and self.button_thread.is_alive():
+
+        if hasattr(self, 'button_thread') and self.button_thread and self.button_thread.is_alive():
             self.button_thread.join(timeout=0.5)
+
         if self.pwm:
             self.pwm.stop()
+            self.pwm = None
+
         self.stop_pattern_thread()
-        if not self.led_disabled:
-            GPIO.output(self.LED_PIN, GPIO.LOW)
+
+        try:
+            GPIO.cleanup()
+        except Exception:
+            pass  # Ignore errors during cleanup
 
 
 if __name__ == "__main__":
@@ -418,7 +442,10 @@ if __name__ == "__main__":
         try:
             LedControl().set_state(sys.argv[1])
         except KeyboardInterrupt:
-            GPIO.cleanup()
+            LedControl().cleanup()
         except Exception as e:
             print(f"Error: {str(e)}")
-            GPIO.cleanup()
+            try:
+                GPIO.cleanup()
+            except:
+                pass
