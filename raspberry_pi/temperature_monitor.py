@@ -14,7 +14,7 @@ from gpiozero import CPUTemperature
 from api import make_api_request, api_token_exists, set_api_token, make_api_request_with_creds
 from freezerbot_setup import FreezerBotSetup
 from config import Config
-from pisugar import PiSugarMonitor
+from battery import PiSugarMonitor
 from network import test_internet_connectivity, load_network_status, save_network_status, reset_network_status
 from restarts import restart_in_setup_mode
 

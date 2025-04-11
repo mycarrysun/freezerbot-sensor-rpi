@@ -4,3 +4,4 @@ RPi.GPIO==0.7.1
 gpiozero==1.6.2
 w1thermsensor~=2.3.0
 python-dotenv~=1.0.1
+pisugar~=0.1.1
