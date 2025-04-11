@@ -71,4 +71,11 @@ rm -f "${MOUNT_POINT}/var/log/"*.gz
 echo "MODEL_NAME=${MODEL_NAME//\"/}" > "${MOUNT_POINT}${FREEZERBOT_DIR}/.env"
 echo "freezerbot" > "$MOUNT_POINT"/etc/hostname
 
+if [ -z "$MOUNT_POINT" ]
+then
+  # if running on a machine we can clear the crontab
+  echo "Removing users crontab"
+  echo "" | crontab -u pi -
+fi
+
 echo "Factory reset completed successfully."

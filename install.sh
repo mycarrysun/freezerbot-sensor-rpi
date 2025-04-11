@@ -54,9 +54,7 @@ chown -R pi:pi $FREEZERBOT_DIR
 echo "Setting up Python virtual environment..."
 cd $FREEZERBOT_DIR
 python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+# pip install happens in firmware_updater.py
 
 # Copy service files
 echo "Installing systemd service files..."

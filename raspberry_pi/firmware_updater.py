@@ -245,6 +245,11 @@ class FirmwareUpdater:
                 log_prefix="Install"
             )
 
+            self.run_command_with_logging(
+                ["/usr/bin/sudo", f"{self.base_directory}/.venv/bin/pip", "install", "-r", f"{self.base_directory}/requirements.txt"],
+                log_prefix="PIP install"
+            )
+
             # LEVEL 0: Standard update with full verification
             if failure_count < 2:
                 return self.verify_and_handle_rollback(backup_path, current_directory)
