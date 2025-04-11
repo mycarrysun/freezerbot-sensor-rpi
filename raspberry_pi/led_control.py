@@ -14,7 +14,6 @@ from restarts import restart_in_setup_mode
 from config import Config
 
 LED_CONTROL_DISABLED = 'LED_DISABLED'
-INPUT_PULLUP_MODE = 3
 
 class LedControl:
     """Class for controlling the button's built-in LED"""
@@ -101,7 +100,7 @@ class LedControl:
                     GPIO.setmode(GPIO.BCM)
 
                 current_function = GPIO.gpio_function(self.BUTTON_PIN)
-                if current_function != INPUT_PULLUP_MODE:
+                if current_function != GPIO.IN:
                     GPIO.setup(self.BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
                     print(f"Button pin {self.BUTTON_PIN} reconfigured as input with pull-up")
                     time.sleep(0.1)  # Short delay to allow hardware to stabilize
