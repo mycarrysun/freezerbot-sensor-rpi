@@ -238,8 +238,6 @@ class TemperatureMonitor:
                         self.led_control.set_state("error")
 
                 if len(self.consecutive_errors) > 0:
-                    print(f'Consecutive errors: {len(self.consecutive_errors)}')
-                    print("\n\n".join(self.consecutive_errors))
                     self.report_consecutive_errors()
 
             except Exception as e:
@@ -255,14 +253,15 @@ class TemperatureMonitor:
                 time.sleep(60)
 
     def report_consecutive_errors(self):
-        response = make_api_request('sensors/errors', json={
-            'errors': self.consecutive_errors
-        })
+        if len(self.consecutive_errors) > 0:
+            response = make_api_request('sensors/errors', json={
+                'errors': self.consecutive_errors
+            })
 
-        if response.status_code == 200:
-            self.consecutive_errors = []
-        else:
-            print(f'Error reporting errors: {response.status_code} - {response.text}')
+            if response.status_code == 200:
+                self.consecutive_errors = []
+            else:
+                print(f'Error reporting errors: {response.status_code} - {response.text}')
 
     def cleanup(self):
         """Clean up GPIO on exit"""
