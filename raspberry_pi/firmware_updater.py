@@ -290,7 +290,7 @@ class FirmwareUpdater:
         if 'active (running)' not in monitor_status.stdout and 'active (running)' not in setup_status.stdout:
             error_text = 'Neither monitor nor setup service is running after applying updates. Rolling back.'
             self.logger.error(error_text)
-            self.add_error_to_update_attempt(error_text+f"\n\n{monitor_status.stdout}\n\n{setup_status.stdout}")
+            self.add_error_to_update_attempt(error_text + f"\n\n{monitor_status.stdout}\n\n{setup_status.stdout}")
             os.chdir(current_directory)
             self.rollback_to_backup(backup_path)
             return False
@@ -307,6 +307,8 @@ class FirmwareUpdater:
         }
         self.save_update_history()
         self.logger.info("Update successful - history cleared")
+
+        self.update_device_info_json()
 
     def rollback_to_backup(self, backup_path):
         """Restore previous version if update failed"""
@@ -335,6 +337,46 @@ class FirmwareUpdater:
             return True
         except Exception as error:
             error_text = f"Rollback failed: {traceback.format_exc()}"
+            self.logger.error(error_text)
+            self.add_error_to_update_attempt(error_text)
+            return False
+
+    def update_device_info_json(self):
+        """Update the device_info.json file with the current git SHA"""
+        self.logger.info("Updating device_info.json with the new firmware version")
+        try:
+            device_info_path = os.path.join(self.base_directory, "device_info.json")
+
+            # Check if the file exists
+            if not os.path.exists(device_info_path):
+                self.logger.warning(f"device_info.json not found at {device_info_path}")
+                return False
+
+            # Get current git SHA
+            current_directory = os.getcwd()
+            os.chdir(self.base_directory)
+
+            git_sha_result = self.run_command_with_logging(
+                ["/usr/bin/git", "rev-parse", "HEAD"],
+                log_prefix="Git SHA"
+            )
+            git_sha = git_sha_result.stdout.strip()
+
+            os.chdir(current_directory)
+
+            with open(device_info_path, 'r') as f:
+                device_info = json.load(f)
+
+            device_info['firmware_version'] = git_sha
+
+            with open(device_info_path, 'w') as f:
+                json.dump(device_info, f, indent=2)
+
+            self.logger.info(f"Successfully updated firmware_version to {git_sha}")
+            return True
+
+        except Exception as error:
+            error_text = f"Failed to update device_info.json: {traceback.format_exc()}"
             self.logger.error(error_text)
             self.add_error_to_update_attempt(error_text)
             return False

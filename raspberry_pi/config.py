@@ -36,6 +36,10 @@ class Config:
             json.dump(new_config, f, indent=2)
         self.config = new_config
 
+    def save_device_name(self, new_name):
+        self.config['device_name'] = new_name
+        self.save_new_config(self.config)
+
     def clear_creds_from_config(self):
         del self.config['email']
         del self.config['password']

@@ -216,6 +216,10 @@ class TemperatureMonitor:
                         self.led_control.set_state('running')
                         self.report_consecutive_errors()
                         api_failure_count = 0
+                        response_json = response.json()
+                        possible_name = response_json.get('name')
+                        if possible_name and self.config.config['device_name'] != possible_name:
+                            self.config.save_device_name(possible_name)
                     else:
                         api_failure_count += 1
                         self.consecutive_errors.append(f'API error: {response.status_code} - {response.text}')
