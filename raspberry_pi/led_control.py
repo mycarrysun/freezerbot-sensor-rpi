@@ -366,8 +366,8 @@ class LedControl:
                 self.set_state("error")
                 return
 
-            print("Factory reset completed. System will restart in setup mode.")
-            # No need to call restart_in_setup_mode() as the script already handles this
+            print("Factory reset completed. Rebooting...")
+            self.reboot_system()
 
         except Exception as e:
             print(f"Error during factory reset: {traceback.format_exc()}")
