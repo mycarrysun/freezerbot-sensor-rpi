@@ -343,12 +343,12 @@ class LedControl:
             self.set_state("factory_reset")
 
             # Path to the factory reset script
-            script_path = "/home/pi/freezerbot/factory-reset.sh"
+            script_path = "/home/pi/freezerbot/bin/factory-reset.sh"
 
             # Check if script exists and is executable
             if not os.path.exists(script_path):
                 script_dir = os.path.dirname(os.path.abspath(__file__))
-                script_path = os.path.join(os.path.dirname(script_dir), "factory-reset.sh")
+                script_path = os.path.join(os.path.dirname(script_dir), 'bin', "factory-reset.sh")
 
                 if not os.path.exists(script_path):
                     print(f"Factory reset script not found at {script_path}")
