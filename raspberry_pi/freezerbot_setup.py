@@ -281,11 +281,11 @@ address=/#/192.168.4.1
         """Main entry point"""
         if not self.config.configuration_exists or not self.config.is_configured:
             # Set LED to blinking
-            self.led_control.set_state("setup")
-
             try:
                 # Start in setup mode
                 self.start_hotspot()
+
+                self.led_control.set_state("setup")
 
                 # Start the web server only if hotspot is successfully created
                 self.app.run(host="0.0.0.0", port=80)
