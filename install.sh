@@ -76,4 +76,4 @@ $FREEZERBOT_DIR/.venv/bin/python $FREEZERBOT_PYTHON_DIR/start.py
 echo "Setting up startup script..."
 echo "@reboot $FREEZERBOT_DIR/.venv/bin/python $FREEZERBOT_PYTHON_DIR/start.py >> $LOGS_DIR/start.log" | crontab -u pi -
 
-echo "Installation complete! Freezerbot is now running."
+echo "Installation complete! Freezerbot is now running"
