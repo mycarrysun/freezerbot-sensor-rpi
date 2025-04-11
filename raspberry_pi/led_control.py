@@ -90,6 +90,9 @@ class LedControl:
         ten_second_mark_reached = False
         thirty_second_mark_reached = False
 
+        last_state_change_time = 0
+        debounce_time = 0.05  # 50ms debounce
+
         reboot_triggered = False
         setup_mode_triggered = False
         factory_reset_triggered = False
@@ -105,12 +108,19 @@ class LedControl:
                     print(f"Button pin {self.BUTTON_PIN} reconfigured as input with pull-up")
                     time.sleep(0.1)  # Short delay to allow hardware to stabilize
 
+                current_time = time.time()
                 current_state = GPIO.input(self.BUTTON_PIN)
+
+                # Only process state changes after debounce time has passed
+                if current_time - last_state_change_time < debounce_time:
+                    time.sleep(0.01)  # Short sleep to prevent CPU hogging
+                    continue
 
                 # Button pressed (LOW when pressed with pull-up resistor)
                 if current_state == GPIO.LOW and not button_pressed:
                     button_pressed = True
-                    press_start_time = time.time()
+                    press_start_time = current_time
+                    last_state_change_time = current_time
                     two_second_mark_reached = False
                     ten_second_mark_reached = False
                     thirty_second_mark_reached = False
@@ -120,27 +130,31 @@ class LedControl:
                     print("Button pressed")
 
                 # Button still pressed - check for 2 second mark
-                elif current_state == GPIO.LOW and button_pressed and not two_second_mark_reached and time.time() - press_start_time > 2:
-                    print("2 second press detected - preparing for reboot")
-                    two_second_mark_reached = True
-                    self.signal_reboot_preparation()
+                elif current_state == GPIO.LOW and button_pressed:
+                    hold_duration = current_time - press_start_time
 
-                # Check for 10 second press while button is still pressed
-                elif current_state == GPIO.LOW and button_pressed and not ten_second_mark_reached and time.time() - press_start_time > 10:
-                    print("Long press detected (10 seconds) - preparing for reset mode")
-                    ten_second_mark_reached = True
-                    self.signal_reset_mode()
+                    if not two_second_mark_reached and hold_duration > 2:
+                        print("2 second press detected - preparing for reboot")
+                        two_second_mark_reached = True
+                        self.signal_reboot_preparation()
 
-                # Check for 30 second press while button is still pressed
-                elif current_state == GPIO.LOW and button_pressed and not thirty_second_mark_reached and time.time() - press_start_time > 30:
-                    print("Extra long press detected (30 seconds) - preparing for factory reset")
-                    thirty_second_mark_reached = True
-                    self.signal_factory_reset()
+                    # Check for 10 second press while button is still pressed
+                    elif not ten_second_mark_reached and hold_duration > 10:
+                        print("Long press detected (10 seconds) - preparing for reset mode")
+                        ten_second_mark_reached = True
+                        self.signal_reset_mode()
+
+                    # Check for 30 second press while button is still pressed
+                    elif not thirty_second_mark_reached and hold_duration > 30:
+                        print("Extra long press detected (30 seconds) - preparing for factory reset")
+                        thirty_second_mark_reached = True
+                        self.signal_factory_reset()
 
                 # Button released
                 elif current_state == GPIO.HIGH and button_pressed:
                     button_pressed = False
-                    duration = time.time() - press_start_time
+                    last_state_change_time = current_time
+                    duration = current_time - press_start_time
                     print(f"Button released after {duration:.1f} seconds")
 
                     if thirty_second_mark_reached and not factory_reset_triggered:
