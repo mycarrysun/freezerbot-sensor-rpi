@@ -87,6 +87,8 @@ class LedControl:
         button_pressed = False
         press_start_time = 0
         two_second_mark_reached = False
+        ten_second_mark_reached = False
+        thirty_second_mark_reached = False
 
         while self.running and not self.button_disabled:
             try:
@@ -99,6 +101,8 @@ class LedControl:
                     button_pressed = True
                     press_start_time = time.time()
                     two_second_mark_reached = False
+                    ten_second_mark_reached = False
+                    thirty_second_mark_reached = False
                     print("Button pressed")
 
                 # Button still pressed - check for 2 second mark
@@ -107,16 +111,17 @@ class LedControl:
                     two_second_mark_reached = True
                     self.signal_reboot_preparation()
 
-                # Check for long press while button is still pressed
-                elif current_state == GPIO.LOW and button_pressed and time.time() - press_start_time > 10:
-                    print("Long press detected (10 seconds) - triggering reset")
-                    button_pressed = False  # Reset so we don't trigger multiple times
-                    two_second_mark_reached = False
+                # Check for 10 second press while button is still pressed
+                elif current_state == GPIO.LOW and button_pressed and not ten_second_mark_reached and time.time() - press_start_time > 10:
+                    print("Long press detected (10 seconds) - preparing for reset mode")
+                    ten_second_mark_reached = True
                     self.signal_reset_mode()
-                    # clear just the api token so we still have the current config to allow editing
-                    # the user will just have to re-enter their email/password
-                    clear_api_token()
-                    restart_in_setup_mode()
+
+                # Check for 30 second press while button is still pressed
+                elif current_state == GPIO.LOW and button_pressed and not thirty_second_mark_reached and time.time() - press_start_time > 30:
+                    print("Extra long press detected (30 seconds) - preparing for factory reset")
+                    thirty_second_mark_reached = True
+                    self.signal_factory_reset()
 
                 # Button released
                 elif current_state == GPIO.HIGH and button_pressed:
@@ -124,12 +129,24 @@ class LedControl:
                     duration = time.time() - press_start_time
                     print(f"Button released after {duration:.1f} seconds")
 
+                    if thirty_second_mark_reached:
+                        print("Factory resetting system...")
+                        self.perform_factory_reset()
+                    # If we have passed the 10 second mark but not the 30 second mark, reset to setup mode
+                    elif ten_second_mark_reached and duration < 30:
+                        print("Resetting to setup mode...")
+                        # clear just the api token so we still have the current config to allow editing
+                        # the user will just have to re-enter their email/password
+                        clear_api_token()
+                        restart_in_setup_mode()
                     # If we have passed the 2 second mark but not the 10 second mark, reboot
-                    if two_second_mark_reached and duration < 10:
+                    elif two_second_mark_reached and duration < 10:
                         print("Rebooting system...")
                         self.reboot_system()
 
                     two_second_mark_reached = False
+                    ten_second_mark_reached = False
+                    thirty_second_mark_reached = False
 
                 # Small sleep to prevent CPU hogging
                 time.sleep(0.1)
@@ -169,6 +186,12 @@ class LedControl:
         elif state == "wifi_issue":
             # Double-blink pattern for WiFi connectivity issues
             self.start_pattern_thread(self.wifi_issue_pattern)
+        elif state == "factory_reset":
+            # Very fast blinking pattern for factory reset (10 Hz)
+            if self.pwm:
+                self.pwm.stop()
+            self.pwm = GPIO.PWM(self.LED_PIN, 10)
+            self.pwm.start(50)
 
     def wifi_issue_pattern(self):
         """LED pattern for WiFi connectivity issues: double-blink with pause"""
@@ -234,6 +257,28 @@ class LedControl:
             GPIO.output(self.LED_PIN, GPIO.LOW)
             time.sleep(0.2)
 
+    def signal_factory_reset(self):
+        """Visual indication that the system is preparing for factory reset (10 rapid blinks)"""
+        if self.module_disabled or self.led_disabled:
+            return
+
+        # Stop any current patterns
+        self.stop_pattern_thread()
+
+        # Blink 10 times rapidly to indicate factory reset
+        if self.pwm:
+            self.pwm.stop()
+            self.pwm = None
+
+        for _ in range(10):
+            GPIO.output(self.LED_PIN, GPIO.HIGH)
+            time.sleep(0.05)
+            GPIO.output(self.LED_PIN, GPIO.LOW)
+            time.sleep(0.05)
+
+        # Set to factory reset state (very fast blinking)
+        self.set_state("factory_reset")
+
     def signal_successful_transmission(self):
         """Visual indication that a temperature reading was successfully sent (2 fast blinks)"""
         if self.module_disabled or self.led_disabled:
@@ -279,6 +324,44 @@ class LedControl:
             self.current_state = None
             self.pattern_thread.join(timeout=0.5)
             self.pattern_thread = None
+
+    def perform_factory_reset(self):
+        """Perform a factory reset of the device using the factory-reset.sh script"""
+        try:
+            print("Performing factory reset...")
+            # Set LED to indicate factory reset in progress
+            self.set_state("factory_reset")
+
+            # Path to the factory reset script
+            script_path = "/home/pi/freezerbot/factory-reset.sh"
+
+            # Check if script exists and is executable
+            if not os.path.exists(script_path):
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                script_path = os.path.join(os.path.dirname(script_dir), "factory-reset.sh")
+
+                if not os.path.exists(script_path):
+                    print(f"Factory reset script not found at {script_path}")
+                    self.set_state("error")
+                    return
+
+            # Make sure the script is executable
+            subprocess.run(["/usr/bin/sudo", "/usr/bin/chmod", "+x", script_path], check=True)
+
+            # Run the factory reset script with sudo
+            result = subprocess.run(["/usr/bin/sudo", script_path], check=True)
+
+            if result.returncode != 0:
+                print(f"Factory reset script failed with exit code {result.returncode}")
+                self.set_state("error")
+                return
+
+            print("Factory reset completed. System will restart in setup mode.")
+            # No need to call restart_in_setup_mode() as the script already handles this
+
+        except Exception as e:
+            print(f"Error during factory reset: {traceback.format_exc()}")
+            self.set_state("error")
 
     def reboot_system(self):
         """Reboot the system"""

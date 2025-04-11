@@ -35,12 +35,8 @@ OUTPUT_DIR="$SCRIPT_DIR/../images"
 CURRENT_DATE=$(date +%Y%m%d)
 OUTPUT_FILE="$OUTPUT_DIR/${MODEL_NAME// /-}-$CURRENT_DATE.img"
 PISHRINK_OUTPUT_FILE="$OUTPUT_DIR/${MODEL_NAME// /-}-$CURRENT_DATE.pishrink.img.gz"
-FREEZERBOT_DIR="/home/pi/freezerbot"
-PI_DIR="/home/pi"
 
 mkdir -p "$OUTPUT_DIR"
-
-
 
 # Function to check if argument is a valid block device
 function check_block_device {
@@ -107,39 +103,7 @@ mkdir -p "$MOUNT_POINT/boot"
 mount "${DEVICE}1" "$MOUNT_POINT/boot"  # Boot partition
 
 echo "Cleaning up Freezerbot dynamic files..."
-
-# Remove configuration files
-rm -rf "$MOUNT_POINT/$FREEZERBOT_DIR/config.json"
-rm -rf "$MOUNT_POINT/$FREEZERBOT_DIR/.env"
-rm -rf "$MOUNT_POINT/$FREEZERBOT_DIR/device_info.json"
-
-# Remove logs and backups
-rm -rf "$MOUNT_POINT/$PI_DIR/freezerbot-logs/"*
-rm -rf "$MOUNT_POINT/$PI_DIR/freezerbot-backups/"*
-
-# Remove NetworkManager connections (WiFi configurations)
-rm -f "$MOUNT_POINT/etc/NetworkManager/system-connections/"*
-rm -rf "$MOUNT_POINT/etc/ssl/certs/freezerbot-"*
-
-# Clean systemd files that are created outside the repo
-rm -f "$MOUNT_POINT/etc/systemd/system/freezerbot-"*
-rm -f "$MOUNT_POINT"/etc/systemd/system/*/freezerbot-*
-
-# Remove hostapd and dnsmasq configs
-rm -f "$MOUNT_POINT/etc/hostapd/hostapd.conf"
-rm -f "$MOUNT_POINT/etc/dnsmasq.conf"
-
-# Clean bash history
-rm -rf "$MOUNT_POINT/home/pi/.bash_history"
-
-# Clean system logs
-rm -rf "$MOUNT_POINT/var/log/journal/"*
-rm -f "$MOUNT_POINT/var/log/"*.log
-rm -f "$MOUNT_POINT/var/log/"*.gz
-
-# Setup files with contents
-echo "MODEL_NAME=$MODEL_NAME" >> "$MOUNT_POINT/$FREEZERBOT_DIR/.env"
-echo "freezerbot" > "$MOUNT_POINT/etc/hostname"
+"$SCRIPT_DIR/factory-reset.sh" "$MOUNT_POINT"
 
 echo "Unmounting partitions..."
 umount "$MOUNT_POINT/boot"
