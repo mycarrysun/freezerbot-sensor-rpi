@@ -90,6 +90,10 @@ class LedControl:
         ten_second_mark_reached = False
         thirty_second_mark_reached = False
 
+        reboot_triggered = False
+        setup_mode_triggered = False
+        factory_reset_triggered = False
+
         while self.running and not self.button_disabled:
             try:
                 if GPIO.getmode() != GPIO.BCM:
@@ -103,6 +107,9 @@ class LedControl:
                     two_second_mark_reached = False
                     ten_second_mark_reached = False
                     thirty_second_mark_reached = False
+                    reboot_triggered = False
+                    setup_mode_triggered = False
+                    factory_reset_triggered = False
                     print("Button pressed")
 
                 # Button still pressed - check for 2 second mark
@@ -129,19 +136,22 @@ class LedControl:
                     duration = time.time() - press_start_time
                     print(f"Button released after {duration:.1f} seconds")
 
-                    if thirty_second_mark_reached:
+                    if thirty_second_mark_reached and not factory_reset_triggered:
                         print("Factory resetting system...")
+                        factory_reset_triggered = True
                         self.perform_factory_reset()
                     # If we have passed the 10 second mark but not the 30 second mark, reset to setup mode
-                    elif ten_second_mark_reached and duration < 30:
+                    elif ten_second_mark_reached and duration < 30 and not setup_mode_triggered:
                         print("Resetting to setup mode...")
+                        setup_mode_triggered = True
                         # clear just the api token so we still have the current config to allow editing
                         # the user will just have to re-enter their email/password
                         clear_api_token()
                         restart_in_setup_mode()
                     # If we have passed the 2 second mark but not the 10 second mark, reboot
-                    elif two_second_mark_reached and duration < 10:
+                    elif two_second_mark_reached and duration < 10 and not reboot_triggered:
                         print("Rebooting system...")
+                        reboot_triggered = True
                         self.reboot_system()
 
                     two_second_mark_reached = False
