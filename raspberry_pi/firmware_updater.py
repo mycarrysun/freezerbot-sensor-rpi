@@ -378,6 +378,16 @@ class FirmwareUpdater:
                 json.dump(device_info, f, indent=2)
 
             self.logger.info(f"Successfully updated firmware_version to {git_sha}")
+
+            try:
+                response = make_api_request('sensors/firmware-update', json={
+                    'version': git_sha
+                })
+                if response.status_code != 200:
+                    self.logger.error(f'Error sending firmware update to api: {response.status_code} - {response.text}')
+            except Exception:
+                self.logger.error(f'Error sending firmware update to api: {traceback.format_exc()}')
+
             return True
 
         except Exception as error:
