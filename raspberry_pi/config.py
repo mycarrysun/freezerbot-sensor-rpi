@@ -41,8 +41,10 @@ class Config:
         self.save_new_config(self.config)
 
     def clear_creds_from_config(self):
-        del self.config['email']
-        del self.config['password']
+        if 'email' in self.config:
+            del self.config['email']
+        if 'password' in self.config:
+            del self.config['password']
         self.save_new_config(self.config)
 
     def add_config_error(self, error):

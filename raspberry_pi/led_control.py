@@ -183,6 +183,7 @@ class LedControl:
                         # clear just the api token so we still have the current config to allow editing
                         # the user will just have to re-enter their email/password
                         clear_api_token()
+                        self.config.clear_creds_from_config()
                         restart_in_setup_mode()
                     # If we have passed the 2 second mark but not the 10 second mark, reboot
                     elif two_second_mark_reached and duration < 10 and not self.reboot_triggered:
