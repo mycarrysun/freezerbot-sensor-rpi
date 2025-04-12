@@ -16,6 +16,7 @@ from freezerbot_setup import FreezerBotSetup
 from config import Config
 from battery import PiSugarMonitor
 from network import test_internet_connectivity, load_network_status, save_network_status, reset_network_status
+from device_info import DeviceInfo
 from restarts import restart_in_setup_mode
 
 
@@ -23,12 +24,12 @@ class TemperatureMonitor:
     def __init__(self):
         """Initialize the temperature monitoring application"""
         self.config = Config()
-        self.device_info_file = "/home/pi/freezerbot/device_info.json"
         self.consecutive_errors = []
 
         self.led_control = LedControl()
         self.freezerbot_setup = FreezerBotSetup()
         self.pisugar = PiSugarMonitor()
+        self.device_info = DeviceInfo()
         self.sensor = None
         self.consecutive_sensor_errors = 0
         self.max_errors_before_sensor_reset = 3
@@ -48,19 +49,13 @@ class TemperatureMonitor:
 
     def obtain_api_token(self):
         if not api_token_exists():
-            device_info = {}
-            if not os.path.exists(self.device_info_file):
-                print("Device info file not found. Continuing.")
-            else:
-                with open(self.device_info_file, "r") as f:
-                    device_info = json.load(f)
             response = make_api_request_with_creds(
                 {
                     'email': self.config.config['email'],
                     'password': self.config.config['password'],
                 },
                 'sensors/configure',
-                json={**device_info, **{
+                json={**self.device_info.device_info, **{
                     'name': self.config.config['device_name'],
                     'configured_at': datetime.utcnow().isoformat() + 'Z'
                 }}

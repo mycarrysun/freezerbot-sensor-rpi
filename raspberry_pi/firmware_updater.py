@@ -9,6 +9,7 @@ from time import sleep
 from config import Config
 from api import api_token_exists
 from api import make_api_request
+from device_info import DeviceInfo
 from temperature_monitor import TemperatureMonitor
 
 
@@ -26,6 +27,7 @@ class FirmwareUpdater:
         self.initialize_paths()
         self.setup_logging()
         self.config = Config()
+        self.device_info = DeviceInfo()
         self.ensure_backup_directory_exists()
 
         # Load update history
@@ -350,13 +352,6 @@ class FirmwareUpdater:
         """Update the device_info.json file with the current git SHA"""
         self.logger.info("Updating device_info.json with the new firmware version")
         try:
-            device_info_path = os.path.join(self.base_directory, "device_info.json")
-
-            # Check if the file exists
-            if not os.path.exists(device_info_path):
-                self.logger.warning(f"device_info.json not found at {device_info_path}")
-                return False
-
             # Get current git SHA
             current_directory = os.getcwd()
             os.chdir(self.base_directory)
@@ -369,13 +364,7 @@ class FirmwareUpdater:
 
             os.chdir(current_directory)
 
-            with open(device_info_path, 'r') as f:
-                device_info = json.load(f)
-
-            device_info['firmware_version'] = git_sha
-
-            with open(device_info_path, 'w') as f:
-                json.dump(device_info, f, indent=2)
+            self.device_info.update_firmware_version(git_sha)
 
             self.logger.info(f"Successfully updated firmware_version to {git_sha}")
 
