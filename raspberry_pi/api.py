@@ -4,7 +4,7 @@ from dotenv import load_dotenv, set_key, unset_key
 
 API_TOKEN = 'API_TOKEN'
 API_HOST = 'FREEZERBOT_API_HOST'
-DEFAULT_HOST = 'https://freezerbot.nextwebtoday.com'
+DEFAULT_HOST = 'https://api.freezerbot.com'
 
 def make_api_request_with_creds(credentials, path, method='POST', json={}):
     endpoint = f'{os.getenv(API_HOST, DEFAULT_HOST)}/api/{path}'
