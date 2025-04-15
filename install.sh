@@ -62,15 +62,18 @@ cp $FREEZERBOT_DIR/system/freezerbot-setup.service /etc/systemd/system/
 cp $FREEZERBOT_DIR/system/freezerbot-monitor.service /etc/systemd/system/
 cp $FREEZERBOT_DIR/system/freezerbot-updater.service /etc/systemd/system/
 cp $FREEZERBOT_DIR/system/freezerbot-updater.timer /etc/systemd/system/
+cp $FREEZERBOT_DIR/system/freezerbot-power-led.service /etc/systemd/system/
 
 # Set up permissions
 chmod 644 /etc/systemd/system/freezerbot-setup.service
 chmod 644 /etc/systemd/system/freezerbot-monitor.service
 chmod 644 /etc/systemd/system/freezerbot-updater.service
 chmod 644 /etc/systemd/system/freezerbot-updater.timer
+chmod 644 /etc/systemd/system/freezerbot-power-led.service
 
 # Enable services
 systemctl daemon-reload
+systemctl enable freezerbot-power-led.service
 $FREEZERBOT_DIR/.venv/bin/python $FREEZERBOT_PYTHON_DIR/start.py
 
 echo "Setting up startup script..."

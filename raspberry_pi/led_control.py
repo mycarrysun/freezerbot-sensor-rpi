@@ -14,7 +14,8 @@ from restarts import restart_in_setup_mode
 from config import Config
 
 LED_CONTROL_DISABLED = 'LED_DISABLED'
-
+BUTTON_PIN = 17
+LED_PIN = 27
 
 class LedControl:
     """Class for controlling the button's built-in LED with singleton pattern"""
@@ -45,8 +46,8 @@ class LedControl:
         self.button_disabled = False
         self.config = Config()
 
-        self.BUTTON_PIN = 17
-        self.LED_PIN = 27
+        self.BUTTON_PIN = BUTTON_PIN
+        self.LED_PIN = LED_PIN
         self.pattern_thread = None
         self.pwm = None
         self.running = False
