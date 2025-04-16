@@ -102,7 +102,6 @@ echo "Mounting partitions..."
 mount "${DEVICE}2" "$MOUNT_POINT"  # Root filesystem
 mkdir -p "$MOUNT_POINT/boot"
 mount "${DEVICE}1" "$MOUNT_POINT/boot"  # Boot partition
-exit 0
 
 echo "Cleaning up Freezerbot dynamic files..."
 "$SCRIPT_DIR/factory-reset.sh" "$MOUNT_POINT"
