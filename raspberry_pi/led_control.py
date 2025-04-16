@@ -211,26 +211,22 @@ class LedControl:
             return
         # Stop any existing pattern thread
         self.stop_pattern_thread()
+        if self.pwm:
+            self.pwm.stop()
+            self.pwm = None
 
         # Set the current state
         self.current_state = state
 
         if state == "setup":
             # Blinking blue in setup mode (1 Hz)
-            if self.pwm:
-                self.pwm.stop()
             self.pwm = GPIO.PWM(self.LED_PIN, 1)
             self.pwm.start(50)  # 50% duty cycle - half on, half off
         elif state == "running":
             # Solid on in normal operation
-            if self.pwm:
-                self.pwm.stop()
-                self.pwm = None
             GPIO.output(self.LED_PIN, GPIO.HIGH)
         elif state == "error":
             # Fast blinking in error state (5 Hz)
-            if self.pwm:
-                self.pwm.stop()
             self.pwm = GPIO.PWM(self.LED_PIN, 5)
             self.pwm.start(50)
         elif state == "wifi_issue":
@@ -238,8 +234,6 @@ class LedControl:
             self.start_pattern_thread(self.wifi_issue_pattern)
         elif state == "factory_reset":
             # Very fast blinking pattern for factory reset (10 Hz)
-            if self.pwm:
-                self.pwm.stop()
             self.pwm = GPIO.PWM(self.LED_PIN, 10)
             self.pwm.start(50)
 
