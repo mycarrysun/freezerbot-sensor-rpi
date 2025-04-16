@@ -95,9 +95,9 @@ class TemperatureMonitor:
         if self.consecutive_sensor_errors >= self.max_errors_before_sensor_reset:
             print(f"Resetting 1-Wire modules after {self.consecutive_sensor_errors} failures")
             try:
-                subprocess.run(["/usr/bin/modprobe", "-r", "w1_gpio", "w1_therm"])
+                subprocess.run(["/usr/sbin/modprobe", "-r", "w1_gpio", "w1_therm"])
                 time.sleep(1)
-                subprocess.run(["/usr/bin/modprobe", "w1_gpio", "w1_therm"])
+                subprocess.run(["/usr/sbin/modprobe", "w1_gpio", "w1_therm"])
                 time.sleep(2)  # Give system time to detect sensors
 
                 self.sensor = W1ThermSensor()
