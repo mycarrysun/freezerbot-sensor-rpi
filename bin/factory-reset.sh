@@ -47,8 +47,10 @@ rm -f "${MOUNT_POINT}${FREEZERBOT_DIR}/device_info.json"
 rm -rf "${MOUNT_POINT}${PI_DIR}/freezerbot-logs/"*
 rm -rf "${MOUNT_POINT}${PI_DIR}/freezerbot-backups/"*
 
-# Remove NetworkManager connections (WiFi configurations)
-rm -f "${MOUNT_POINT}/etc/NetworkManager/system-connections/"*
+# Delete all connection files except eduroam
+if [ -d "${MOUNT_POINT}/etc/NetworkManager/system-connections/" ]; then
+    find "${MOUNT_POINT}/etc/NetworkManager/system-connections/" -type f -not -name "*eduroam*" -exec rm -f {} \;
+fi
 rm -f "${MOUNT_POINT}/etc/ssl/certs/freezerbot-"*
 
 # Clean systemd files that are created outside the repo

@@ -33,8 +33,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MOUNT_POINT="/mnt/freezerbot-sd-card"
 OUTPUT_DIR="$SCRIPT_DIR/../images"
 CURRENT_DATE=$(date +%Y%m%d)
-OUTPUT_FILE="$OUTPUT_DIR/${MODEL_NAME// /-}-$CURRENT_DATE.img"
-PISHRINK_OUTPUT_FILE="$OUTPUT_DIR/${MODEL_NAME// /-}-$CURRENT_DATE.pishrink.img.gz"
+OUTPUT_NAME="$OUTPUT_DIR/${MODEL_NAME// /-}-$CURRENT_DATE"
+OUTPUT_FILE="$OUTPUT_NAME.img"
+PISHRINK_OUTPUT_FILE="$OUTPUT_NAME.pishrink.img.gz"
 
 mkdir -p "$OUTPUT_DIR"
 
@@ -101,9 +102,13 @@ echo "Mounting partitions..."
 mount "${DEVICE}2" "$MOUNT_POINT"  # Root filesystem
 mkdir -p "$MOUNT_POINT/boot"
 mount "${DEVICE}1" "$MOUNT_POINT/boot"  # Boot partition
+exit 0
 
 echo "Cleaning up Freezerbot dynamic files..."
 "$SCRIPT_DIR/factory-reset.sh" "$MOUNT_POINT"
+
+echo "Overwriting MODEL_NAME from factory reset with: MODEL_NAME=${MODEL_NAME//\"/}"
+echo "MODEL_NAME=${MODEL_NAME//\"/}" > "${MOUNT_POINT}${FREEZERBOT_DIR}/.env"
 
 echo "Unmounting partitions..."
 umount "$MOUNT_POINT/boot"

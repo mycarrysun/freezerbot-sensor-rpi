@@ -11,7 +11,8 @@ def clear_nm_connections():
     ).stdout.strip().split('\n')
 
     for conn in connections:
-        if ':wifi' in conn:
+        # always keep eduroam connection
+        if ':wifi' in conn and 'eduroam' not in conn:
             conn_name = conn.split(':')[0]
             subprocess.run(["/usr/bin/nmcli", "connection", "delete", conn_name],
                            stderr=subprocess.DEVNULL)
