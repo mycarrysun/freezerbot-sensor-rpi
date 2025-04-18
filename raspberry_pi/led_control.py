@@ -232,10 +232,6 @@ class LedControl:
         elif state == "wifi_issue":
             # Double-blink pattern for WiFi connectivity issues
             self.start_pattern_thread(self.wifi_issue_pattern)
-        elif state == "factory_reset":
-            # Very fast blinking pattern for factory reset (10 Hz)
-            self.pwm = GPIO.PWM(self.LED_PIN, 10)
-            self.pwm.start(50)
 
     def wifi_issue_pattern(self):
         """LED pattern for WiFi connectivity issues: double-blink with pause"""
@@ -259,9 +255,6 @@ class LedControl:
         if self.module_disabled or self.led_disabled:
             return
 
-        # Store the current state
-        previous_state = self.current_state
-
         # Stop any current patterns
         self.stop_pattern_thread()
 
@@ -275,12 +268,6 @@ class LedControl:
             time.sleep(0.1)
             GPIO.output(self.LED_PIN, GPIO.LOW)
             time.sleep(0.1)
-
-        time.sleep(3)
-
-        # Restore previous state
-        if previous_state:
-            self.set_state(previous_state)
 
     def signal_reset_mode(self):
         """Visual indication that the system is resetting to setup mode (5 blinks)"""
@@ -320,16 +307,10 @@ class LedControl:
             GPIO.output(self.LED_PIN, GPIO.LOW)
             time.sleep(0.05)
 
-        # Set to factory reset state (very fast blinking)
-        self.set_state("factory_reset")
-
     def signal_successful_transmission(self):
         """Visual indication that a temperature reading was successfully sent (2 fast blinks)"""
         if self.module_disabled or self.led_disabled:
             return
-
-        # Store the current state
-        previous_state = self.current_state
 
         # Stop any current patterns
         self.stop_pattern_thread()
@@ -344,10 +325,6 @@ class LedControl:
             time.sleep(0.05)  # Very short on time (50ms)
             GPIO.output(self.LED_PIN, GPIO.LOW)
             time.sleep(0.05)  # Very short off time (50ms)
-
-        # Restore previous state
-        if previous_state:
-            self.set_state(previous_state)
 
     def start_pattern_thread(self, pattern_function):
         """Start a thread to run a custom LED pattern"""
@@ -373,8 +350,6 @@ class LedControl:
         """Perform a factory reset of the device using the factory-reset.sh script"""
         try:
             print("Performing factory reset...")
-            # Set LED to indicate factory reset in progress
-            self.set_state("factory_reset")
 
             # Path to the factory reset script
             script_path = "/home/pi/freezerbot/bin/factory-reset.sh"
