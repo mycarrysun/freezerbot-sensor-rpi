@@ -52,6 +52,7 @@ class LedControl:
         self.pwm = None
         self.running = False
         self.current_state = None
+        self.previous_state = None
         self.button_thread = None
 
         # Action trigger flags
@@ -140,6 +141,7 @@ class LedControl:
                 # Button pressed (LOW when pressed with pull-up resistor)
                 if current_state == GPIO.LOW and not button_pressed:
                     button_pressed = True
+                    self.previous_state = self.current_state
                     press_start_time = time.time()
                     two_second_mark_reached = False
                     ten_second_mark_reached = False
@@ -150,19 +152,19 @@ class LedControl:
                     print(f"[Thread {thread_id}] Button pressed")
 
                 # Button still pressed - check for 2 second mark
-                elif current_state == GPIO.LOW and button_pressed and not two_second_mark_reached and time.time() - press_start_time > 2:
+                elif current_state == GPIO.LOW and button_pressed and not two_second_mark_reached and current_time - press_start_time > 2:
                     print(f"[Thread {thread_id}] 2 second press detected - preparing for reboot")
                     two_second_mark_reached = True
                     self.signal_reboot_preparation()
 
                 # Check for 10 second press while button is still pressed
-                elif current_state == GPIO.LOW and button_pressed and not ten_second_mark_reached and time.time() - press_start_time > 10:
+                elif current_state == GPIO.LOW and button_pressed and not ten_second_mark_reached and current_time - press_start_time > 10:
                     print(f"[Thread {thread_id}] Long press detected (10 seconds) - preparing for reset mode")
                     ten_second_mark_reached = True
                     self.signal_reset_mode()
 
                 # Check for 30 second press while button is still pressed
-                elif current_state == GPIO.LOW and button_pressed and not thirty_second_mark_reached and time.time() - press_start_time > 30:
+                elif current_state == GPIO.LOW and button_pressed and not thirty_second_mark_reached and current_time - press_start_time > 30:
                     print(f"[Thread {thread_id}] Extra long press detected (30 seconds) - preparing for factory reset")
                     thirty_second_mark_reached = True
                     self.signal_factory_reset()
@@ -170,7 +172,7 @@ class LedControl:
                 # Button released
                 elif current_state == GPIO.HIGH and button_pressed:
                     button_pressed = False
-                    duration = time.time() - press_start_time
+                    duration = current_time - press_start_time
                     print(f"[Thread {thread_id}] Button released after {duration:.1f} seconds")
 
                     if thirty_second_mark_reached and not self.factory_reset_triggered:
@@ -191,6 +193,9 @@ class LedControl:
                         print(f"[Thread {thread_id}] Rebooting system...")
                         self.reboot_triggered = True
                         self.reboot_system()
+                    elif not self.reboot_triggered and not self.setup_mode_triggered and not self.factory_reset_triggered and self.previous_state:
+                        # if the button was released without triggering anything we should set it back to the previous state
+                        self.set_state(self.previous_state)
 
                     two_second_mark_reached = False
                     ten_second_mark_reached = False
