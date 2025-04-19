@@ -53,7 +53,6 @@ chown -R pi:pi $FREEZERBOT_DIR
 # Create virtual environment
 echo "Setting up Python virtual environment..."
 cd $FREEZERBOT_DIR
-python3 -m venv .venv
 # pip install happens in firmware_updater.py
 
 # Copy service files

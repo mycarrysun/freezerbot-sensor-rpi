@@ -1,11 +1,50 @@
 # Freezerbot Sensor Firmware (Raspberry Pi)
 
+## Raspberry Pi OS Lite Config
+Raspberry Pi OS Lite is the best choice for this use case as it is lightweight and we will not need the GUI.
+
+Configuration of the OS is required for the hardware in this guide to work with the raspberry pi.
+
+- ```bash
+  sudo apt get update && sudo apt install hostapd dnsmasq
+  ```
+- Create `/etc/rc.local` script with contents:
+  - ```bash
+    #!/bin/bash
+    sudo /home/pi/setup-freezerbot.sh
+    exit 0
+    ```
+- Make it executable
+  - ```bash
+    sudo chmod +x /etc/rc.local
+    ```
+- Enable I2C interface with `sudo raspi-config`
+- Create file called `/home/pi/setup-freezerbot.sh` with contents:
+  - ```bash
+    #!/usr/bin/env bash
+    set -euo pipefail
+    PATH="$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    cd /home/pi/freezerbot
+    if [ ! -f device_info.json ]
+    then
+      sudo ./install.sh
+    fi
+    ```
+- Add `dtoverlay=w1-gpio,gpiopin=11` to the `[all]` section in `/boot/firmware/config.txt`
+  - If you're using a different GPIO pin for the temperature sensor, change the `gpiopin` to match
+- (Only using PiSugar Battery) Install PiSugar Power Manager software:
+  - ```bash
+    wget https://cdn.pisugar.com/release/pisugar-power-manager.sh
+    bash pisugar-power-manager.sh -c release
+    ```
+
 ## Hardware Wiring
 
 Components:
 - Raspberry Pi Zero W/2W
 - Momentary push button with built-in LED (waterproof, 12mm, 3-6V)
 - Temperature sensor (DS18B20 or similar)
+- (Optional) [PiSugar 2 Battery Hat](https://www.pisugar.com/products/pisugar2-raspberry-pi-zero-battery)
 - Case with button mounting hole
 
 GPIO Connections:
