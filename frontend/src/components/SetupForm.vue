@@ -1,77 +1,80 @@
 <template>
   <form @submit.prevent="submitForm">
+    <div class="panel">
+      <h3>Please note: You must have an existing Freezerbot account to continue</h3>
+      <Button class="primary-button"
+              href="https://app.freezerbot.com/register"
+              target="_blank"
+              @click="createAccount"
+              label="Create Account"
+      />
+    </div>
     <div class="step">
-      <label for="device_name">Sensor name:</label>
+      <label for="device_name">What will you call this sensor?</label>
       <input id="device_name" type="text" v-model="formData.device_name" required>
-      <p class="hint">This will name the sensor in the Freezerbot app</p>
+      <p class="hint">This will be the name you see for this sensor in the Freezerbot app (eg. Lab Freezer, Store Room, Kitchen Fridge)</p>
     </div>
 
-    <div class="networks-container">
-      <h3>WiFi Networks</h3>
+    <div class="step">
+      <h3 style="margin-top: 2rem">WiFi Networks</h3>
+      <p class="hint">Please enter all of the WiFi networks that this sensor can use to connect to the internet. You can enter multiple even if you are not near them right now, as long as you know the WiFi Network Name (SSID).</p>
+
       <div v-for="(network, index) in formData.networks" :key="index" class="network-entry">
         <div class="network-header">
           <h4>Network {{ index + 1 }}</h4>
-          <button
+          <Button
             v-if="formData.networks.length > 1"
             type="button"
+            color="danger"
+            label="Remove"
             @click="removeNetwork(index)"
-            class="remove-button"
-          >
-            Remove
-          </button>
+          />
         </div>
 
-        <div class="step">
-          <label :for="`wifi_ssid_${index}`">WiFi Network Name:</label>
-          <div class="input-with-button">
-            <input
-              type="text"
-              :id="`wifi_ssid_${index}`"
-              v-model="network.ssid"
-              required
-            >
-            <button
-              type="button"
-              @click="scanWifi(index)"
-              class="secondary-button"
-            >
-              Scan
-            </button>
-          </div>
+        <label :for="`wifi_ssid_${index}`">WiFi Network Name:</label>
+        <div class="input-with-button">
+          <input
+            type="text"
+            :id="`wifi_ssid_${index}`"
+            v-model="network.ssid"
+            required
+          >
+          <Button
+            type="button"
+            @click="scanWifi(index)"
+            label="Scan"
+            color="secondary"
+          />
+        </div>
 
-          <div v-if="showNetworkList === index" class="wifi-list">
-            <div v-if="isScanning" class="spinner"></div>
-            <div v-else-if="wifiScanningError" class="error-message">{{ wifiScanningError }}</div>
-            <div v-else>
-              <div
-                v-for="availableNetwork in availableNetworks"
-                :key="availableNetwork"
-                class="wifi-option"
-                @click="selectNetwork(availableNetwork, index)"
-              >
-                {{ availableNetwork }}
-              </div>
+        <div v-if="showNetworkList === index" class="wifi-list">
+          <div v-if="isScanning" class="spinner"></div>
+          <div v-else-if="wifiScanningError" class="error-message">{{ wifiScanningError }}</div>
+          <div v-else>
+            <div
+              v-for="availableNetwork in availableNetworks"
+              :key="availableNetwork"
+              class="wifi-option"
+              @click="selectNetwork(availableNetwork, index)"
+            >
+              {{ availableNetwork }}
             </div>
           </div>
         </div>
 
-        <div class="step">
-          <label :for="`wifi_password_${index}`">WiFi Password:</label>
-          <div class="input-with-button">
-            <input
-              :type="showingPassword.includes(index) ? 'text' : 'password'"
-              :id="`wifi_password_${index}`"
-              v-model="network.password"
-              required
-            >
-            <button type="button"
-                    class="secondary-button"
-                    @click="togglePassword(index)"
-            >
-              {{showingPassword.includes(index) ? 'Hide': 'Show'}}
-            </button>
-          </div>
-
+        <label :for="`wifi_password_${index}`" style="margin-top: 1rem">WiFi Password:</label>
+        <div class="input-with-button">
+          <input
+            :type="showingPassword.includes(index) ? 'text' : 'password'"
+            :id="`wifi_password_${index}`"
+            v-model="network.password"
+            required
+          >
+          <Button type="button"
+                  color="neutral"
+                  :label="showingPassword.includes(index) ? 'Hide': 'Show'"
+                  @click="toggleWifiPassword(index)"
+          />
         </div>
 
         <div v-if="network.enterprise" class="enterprise-settings">
@@ -88,37 +91,42 @@
         </div>
       </div>
 
-      <button
+      <Button
         type="button"
         @click="addNetwork"
-        class="secondary-button add-network-button"
-      >
-        Add Another Network
-      </button>
+        color="primary"
+        label="Add Another Network"
+      />
     </div>
 
     <div class="step">
       <label for="email">Freezerbot Email:</label>
       <input type="email" id="email" v-model="formData.email" required>
       <p class="hint">What you use to login to the Freezerbot App</p>
-    </div>
 
-    <div class="step">
       <label for="password">Freezerbot Password:</label>
-      <input id="password" type="password" v-model="formData.password" required>
+      <div class="input-with-button">
+        <input id="password"
+               :type="showingFreezerbotPassword ? 'text' : 'password'"
+               v-model="formData.password"
+               required
+        >
+        <Button :label="showingFreezerbotPassword ? 'Hide' : 'Show'" type="button" @click="togglePassword" color="neutral"/>
+      </div>
     </div>
 
     <div v-if="formError" class="error-message">{{ formError }}</div>
 
-    <button type="submit" :disabled="isSubmitting" class="primary-button">
-      <span v-if="isSubmitting">Setting up...</span>
-      <span v-else>Set Up My Freezerbot</span>
-    </button>
+    <Button type="submit"
+            :disabled="isSubmitting"
+            class="primary-button"
+            :label="isSubmitting ? 'Setting up...' : 'Setup my sensor'"/>
   </form>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue';
+import Button from '@/components/Button.vue'
 
 interface WiFiNetwork {
   ssid: string;
@@ -164,6 +172,7 @@ const formData = reactive<FreezerbotConfig>({
 const availableNetworks = ref<string[]>([]);
 const showNetworkList = ref<number | null>(null);
 const showingPassword = ref<number[]>([]);
+const showingFreezerbotPassword = ref<boolean>(false);
 const isScanning = ref<boolean>(false);
 const isSubmitting = ref<boolean>(false);
 const wifiScanningError = ref<string>('');
@@ -188,13 +197,20 @@ function addNetwork() {
   });
 }
 
-function togglePassword(index: number) {
+function createAccount() {
+  fetch('/api/create-account', {method: 'POST'});
+}
+
+function toggleWifiPassword(index: number) {
   if(!showingPassword.value.includes(index)) {
     showingPassword.value.push(index);
   }else{
     const thisIndex = showingPassword.value.indexOf(index);
     showingPassword.value.splice(thisIndex, 1);
   }
+}
+function togglePassword() {
+  showingFreezerbotPassword.value = !showingFreezerbotPassword.value;
 }
 
 function removeNetwork(index: number) {
@@ -303,9 +319,13 @@ async function submitForm() {
 getCurrentConfig();
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .step {
-  margin-bottom: 20px;
+  margin-bottom: 3rem;
+}
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 0.1em;
+  margin-bottom: 0.1em;
 }
 label {
   display: block;
@@ -315,29 +335,48 @@ label {
 input[type="text"], input[type="password"], input[type="email"], select {
   width: 100%;
   padding: 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  font-family: 'Inter', Arial, sans-serif;
   border-radius: 5px;
   font-size: 16px;
   box-sizing: border-box;
+  background: var(--background-color);
+
+  &:focus-within, &:active, &:focus, &:focus-visible {
+    border-color: var(--border-focus-color);
+    outline: 2px solid var(--border-focus-color);
+    outline-offset: -2px;
+  }
 }
+
+.panel {
+  background-color: #4dbbff33;
+  color: #0083e5;
+  padding: 1rem 1.5rem;
+  margin-bottom: 2rem;
+  border-left: solid 4px #0083e5;
+
+  h3 {
+    margin: 0;
+  }
+
+  a {
+    display: inline-flex;
+    margin: 1rem 0 0.5rem;
+  }
+}
+
 .hint {
   margin-top: 5px;
   font-size: 14px;
-  color: #666;
-}
-.networks-container {
-  border: 1px solid #eee;
-  border-radius: 5px;
-  padding: 15px;
-  margin-bottom: 20px;
-  background-color: #f9f9f9;
+  color: var(--hint-color);
 }
 .network-entry {
   padding: 15px;
   margin-bottom: 15px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-color);
   border-radius: 5px;
-  background-color: white;
 }
 .network-header {
   display: flex;
@@ -347,18 +386,6 @@ input[type="text"], input[type="password"], input[type="email"], select {
 }
 .network-header h4 {
   margin: 0;
-}
-.remove-button {
-  background-color: #f44336;
-  color: white;
-  border: none;
-  padding: 5px 10px;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.remove-button:hover {
-  background-color: #d32f2f;
 }
 .add-network-button {
   width: 100%;
@@ -370,36 +397,6 @@ input[type="text"], input[type="password"], input[type="email"], select {
 }
 .input-with-button input {
   flex-grow: 1;
-}
-.primary-button {
-  background-color: #0066cc;
-  color: white;
-  border: none;
-  padding: 12px 20px;
-  border-radius: 5px;
-  font-size: 16px;
-  cursor: pointer;
-  width: 100%;
-  margin-top: 20px;
-}
-.primary-button:hover {
-  background-color: #0055aa;
-}
-.primary-button:disabled {
-  background-color: #cccccc;
-  cursor: not-allowed;
-}
-.secondary-button {
-  background-color: #f0f0f0;
-  color: #333;
-  border: 1px solid #ddd;
-  padding: 8px 12px;
-  border-radius: 5px;
-  font-size: 14px;
-  cursor: pointer;
-}
-.secondary-button:hover {
-  background-color: #e0e0e0;
 }
 .wifi-list {
   max-height: 150px;
@@ -418,7 +415,7 @@ input[type="text"], input[type="password"], input[type="email"], select {
 }
 .spinner {
   border: 4px solid #f3f3f3;
-  border-top: 4px solid #0066cc;
+  border-top: 4px solid var(--primary-color);
   border-radius: 50%;
   width: 30px;
   height: 30px;
@@ -430,7 +427,7 @@ input[type="text"], input[type="password"], input[type="email"], select {
   100% { transform: rotate(360deg); }
 }
 .error-message {
-  color: #F44336;
+  color: var(--danger-color);
   margin-top: 10px;
   padding: 10px;
   background-color: #FFEBEE;
@@ -445,7 +442,7 @@ input[type="text"], input[type="password"], input[type="email"], select {
 }
 .enterprise-badge {
   display: inline-block;
-  background-color: #0066cc;
+  background-color: var(--primary-color);
   color: white;
   padding: 5px 10px;
   border-radius: 3px;

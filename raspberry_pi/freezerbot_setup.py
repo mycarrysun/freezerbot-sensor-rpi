@@ -1,5 +1,7 @@
 import subprocess
+import threading
 import time
+import traceback
 from time import sleep
 
 import RPi.GPIO as GPIO
@@ -32,6 +34,7 @@ class FreezerBotSetup:
         self.app.route("/api/scan-wifi")(self.scan_wifi)
         self.app.route("/api/get-config")(self.get_current_config)
         self.app.route("/api/setup", methods=["POST"])(self.save_config)
+        self.app.route('/api/create-account', methods=['POST'])(self.create_account)
 
         # Special routes for captive portal detection
         self.app.route("/generate_204")(self.captive_portal_redirect)
@@ -46,6 +49,13 @@ class FreezerBotSetup:
 
     def get_current_config(self):
         return jsonify(self.config.config)
+
+    def create_account(self):
+        # we need to do a quick disconnect so the user can have an internet connection to create their account
+        subprocess.run(["/usr/bin/systemctl", "stop", "hostapd.service"])
+        sleep(5)
+        subprocess.run(["/usr/bin/systemctl", "start", "hostapd.service"])
+        return jsonify({'success': True})
 
     def scan_wifi(self):
         """Scan for available WiFi networks and return as JSON"""
@@ -102,12 +112,28 @@ class FreezerBotSetup:
 
             self.setup_network_manager(networks)
 
-            restart_in_sensor_mode()
+            restart_thread = threading.Thread(
+                target=self.delayed_restart,
+                daemon=True
+            )
+            restart_thread.start()
 
             return jsonify({"success": True})
         except Exception as e:
             self.led_control.set_state('error')
             return jsonify({"success": False, "error": str(e)})
+
+    def delayed_restart(self):
+        """Restart in sensor mode after a delay to allow frontend to show countdown"""
+        try:
+            # Wait for the countdown to complete (10 seconds)
+            time.sleep(10)
+
+            # Then restart in sensor mode
+            restart_in_sensor_mode()
+        except Exception as e:
+            print(f"Error during delayed restart: {traceback.format_exc()}")
+            self.led_control.set_state('error')
 
     def captive_portal_redirect(self):
         """Redirect captive portal detection requests to the setup page"""

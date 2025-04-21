@@ -1,0 +1,32 @@
+@import './fonts.css';
+
+:root {
+    font-size: 16px;
+
+    --background-color: #ffffff;
+    --card-color: #f3f4f6;
+    --primary-color: #109bff;
+    --secondary-color: #818cf8;
+    --neutral-color: #4b5563;
+    --danger-color: #ef4444;
+    --button-text: #ffffff;
+    --text-color: #333333;
+    --hint-color: #777;
+    --border-color: #374151;
+    --border-focus-color: #109bff;
+    @media (prefers-color-scheme: dark) {
+        --background-color: #111827;
+        --card-color: #1f2937;
+        --button-text: #1f2937;
+        --text-color: #ffffff;
+        --hint-color: #aaa;
+    }
+}
+
+body {
+    font-family: 'Inter', Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: var(--background-color);
+    color: var(--text-color);
+}

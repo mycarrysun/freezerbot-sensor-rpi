@@ -41,6 +41,7 @@ class TestFreezerBotSetup:
         self.app.route("/api/scan-wifi")(self.scan_wifi)
         self.app.route("/api/get-config")(self.get_current_config)
         self.app.route("/api/setup", methods=["POST"])(self.save_config)
+        self.app.route('/api/create-account', methods=['POST'])(self.create_account)
 
         # Special routes for captive portal detection (just return success for testing)
         self.app.route("/generate_204")(self.captive_portal_redirect)
@@ -55,6 +56,9 @@ class TestFreezerBotSetup:
 
     def get_current_config(self):
         return jsonify(self.config.config)
+
+    def create_account(self):
+        return jsonify({'success': True})
 
     def scan_wifi(self):
         """Mock WiFi scanning functionality"""
