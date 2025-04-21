@@ -1,14 +1,5 @@
 <template>
   <form @submit.prevent="submitForm">
-    <div class="panel">
-      <h3>Please note: You must have an existing Freezerbot account to continue</h3>
-      <Button class="primary-button"
-              href="https://app.freezerbot.com/register"
-              target="_blank"
-              @click="createAccount"
-              label="Create Account"
-      />
-    </div>
     <div class="step">
       <label for="device_name">What will you call this sensor?</label>
       <input id="device_name" type="text" v-model="formData.device_name" required>
@@ -347,23 +338,6 @@ input[type="text"], input[type="password"], input[type="email"], select {
     border-color: var(--border-focus-color);
     outline: 2px solid var(--border-focus-color);
     outline-offset: -2px;
-  }
-}
-
-.panel {
-  background-color: #4dbbff33;
-  color: #0083e5;
-  padding: 1rem 1.5rem;
-  margin-bottom: 2rem;
-  border-left: solid 4px #0083e5;
-
-  h3 {
-    margin: 0;
-  }
-
-  a {
-    display: inline-flex;
-    margin: 1rem 0 0.5rem;
   }
 }
 

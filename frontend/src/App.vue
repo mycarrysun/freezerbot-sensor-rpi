@@ -5,15 +5,15 @@
     </div>
     <h1>Setup Your Sensor</h1>
 
-    <SetupForm v-if="!setupComplete" @setup-completed="onSetupCompleted" />
+    <AccountCheck v-if="step === 'account'" @continue-to-setup="step = 'setup'"/>
+    <SetupForm v-if="step === 'setup'" @setup-completed="onSetupCompleted" />
 
-    <div v-if="setupComplete" class="success">
+    <div v-if="step === 'complete'" class="success">
       <div class="success-icon">✓</div>
       <h2>Setup Complete!</h2>
       <p>Your sensor has been successfully configured and will switch to monitoring mode in:</p>
       <div class="countdown">{{ countdown }}</div>
       <p>You can now close this page and go back to the Freezerbot Sensors list to view your new Sensor</p>
-      <Button label="View All Sensors" href="https://app.freezerbot.com/sensors" target="_blank"/>
     </div>
   </div>
 </template>
@@ -21,14 +21,13 @@
 <script lang="ts" setup>
 import { ref } from 'vue';
 import SetupForm from './components/SetupForm.vue';
-import Button from '@/components/Button.vue'
+import AccountCheck from '@/components/AccountCheck.vue'
 
-const setupComplete = ref(false);
 const countdown = ref(10);
+const step = ref<'account' | 'setup' | 'complete'>('account');
 
 function onSetupCompleted() {
-  setupComplete.value = true;
-
+  step.value = 'complete';
   const timer = setInterval(() => {
     countdown.value--;
 
