@@ -53,6 +53,7 @@ class LedControl:
         self.running = False
         self.current_state = None
         self.previous_state = None
+        self.button_being_pressed = False
         self.button_thread = None
 
         # Action trigger flags
@@ -118,7 +119,7 @@ class LedControl:
         thread_id = threading.get_ident()
         print(f"Starting button polling thread - Thread ID: {thread_id}")
 
-        button_pressed = False
+        self.button_being_pressed = False
         press_start_time = 0
         two_second_mark_reached = False
         ten_second_mark_reached = False
@@ -139,8 +140,8 @@ class LedControl:
                 current_state = GPIO.input(self.BUTTON_PIN)
 
                 # Button pressed (LOW when pressed with pull-up resistor)
-                if current_state == GPIO.LOW and not button_pressed:
-                    button_pressed = True
+                if current_state == GPIO.LOW and not self.button_being_pressed:
+                    self.button_being_pressed = True
                     self.previous_state = self.current_state
                     press_start_time = time.time()
                     two_second_mark_reached = False
@@ -152,26 +153,26 @@ class LedControl:
                     print(f"[Thread {thread_id}] Button pressed")
 
                 # Button still pressed - check for 2 second mark
-                elif current_state == GPIO.LOW and button_pressed and not two_second_mark_reached and current_time - press_start_time > 2:
+                elif current_state == GPIO.LOW and self.button_being_pressed and not two_second_mark_reached and current_time - press_start_time > 2:
                     print(f"[Thread {thread_id}] 2 second press detected - preparing for reboot")
                     two_second_mark_reached = True
                     self.signal_reboot_preparation()
 
                 # Check for 10 second press while button is still pressed
-                elif current_state == GPIO.LOW and button_pressed and not ten_second_mark_reached and current_time - press_start_time > 10:
+                elif current_state == GPIO.LOW and self.button_being_pressed and not ten_second_mark_reached and current_time - press_start_time > 10:
                     print(f"[Thread {thread_id}] Long press detected (10 seconds) - preparing for reset mode")
                     ten_second_mark_reached = True
                     self.signal_reset_mode()
 
                 # Check for 30 second press while button is still pressed
-                elif current_state == GPIO.LOW and button_pressed and not thirty_second_mark_reached and current_time - press_start_time > 30:
+                elif current_state == GPIO.LOW and self.button_being_pressed and not thirty_second_mark_reached and current_time - press_start_time > 30:
                     print(f"[Thread {thread_id}] Extra long press detected (30 seconds) - preparing for factory reset")
                     thirty_second_mark_reached = True
                     self.signal_factory_reset()
 
                 # Button released
-                elif current_state == GPIO.HIGH and button_pressed:
-                    button_pressed = False
+                elif current_state == GPIO.HIGH and self.button_being_pressed:
+                    self.button_being_pressed = False
                     duration = current_time - press_start_time
                     print(f"[Thread {thread_id}] Button released after {duration:.1f} seconds")
 
@@ -212,7 +213,7 @@ class LedControl:
 
     def set_state(self, state):
         """Set the LED to different states based on mode"""
-        if self.module_disabled or self.led_disabled:
+        if self.module_disabled or self.led_disabled or self.button_being_pressed:
             return
         # Stop any existing pattern thread
         self.stop_pattern_thread()
@@ -220,6 +221,7 @@ class LedControl:
             self.pwm.stop()
             self.pwm = None
 
+        self.previous_state = self.current_state
         # Set the current state
         self.current_state = state
 
@@ -314,7 +316,7 @@ class LedControl:
 
     def signal_successful_transmission(self):
         """Visual indication that a temperature reading was successfully sent (2 fast blinks)"""
-        if self.module_disabled or self.led_disabled:
+        if self.module_disabled or self.led_disabled or self.button_being_pressed:
             return
 
         # Stop any current patterns
@@ -348,7 +350,7 @@ class LedControl:
         """Stop any running pattern thread"""
         if self.pattern_thread and self.pattern_thread.is_alive():
             self.current_state = None
-            self.pattern_thread.join(timeout=0.5)
+            self.pattern_thread.join(timeout=0.1)
             self.pattern_thread = None
 
     def perform_factory_reset(self):
