@@ -142,7 +142,7 @@ class LedControl:
                 # Button pressed (LOW when pressed with pull-up resistor)
                 if current_state == GPIO.LOW and not self.button_being_pressed:
                     self.button_being_pressed = True
-                    self.previous_state = self.current_state
+                    self.set_state('off')
                     press_start_time = time.time()
                     two_second_mark_reached = False
                     ten_second_mark_reached = False
@@ -239,6 +239,8 @@ class LedControl:
         elif state == "wifi_issue":
             # Double-blink pattern for WiFi connectivity issues
             self.start_pattern_thread(self.wifi_issue_pattern)
+        elif state == 'off':
+            GPIO.output(self.LED_PIN, GPIO.LOW)
 
     def wifi_issue_pattern(self):
         """LED pattern for WiFi connectivity issues: double-blink with pause"""
