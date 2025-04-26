@@ -1,7 +1,10 @@
 <template>
   <div class="container">
-    <div class="logo">
+    <div class="logo light">
       <img src="/logo.svg" alt="Freezerbot Logo">
+    </div>
+    <div class="logo dark">
+      <img src="/logo-dark.svg" alt="Freezerbot Logo" />
     </div>
     <h1>Setup Your Sensor</h1>
 
@@ -55,6 +58,23 @@ function onSetupCompleted() {
 }
 .logo img {
   width: 180px;
+}
+
+@media(prefers-color-scheme: light) {
+  .logo.dark {
+    display: none;
+  }
+  .logo.light {
+    display: block;
+  }
+}
+@media(prefers-color-scheme: dark) {
+  .logo.dark {
+    display: block;
+  }
+  .logo.light {
+    display: none;
+  }
 }
 h1 {
   text-align: center;
