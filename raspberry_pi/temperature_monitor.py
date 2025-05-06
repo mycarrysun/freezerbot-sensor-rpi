@@ -90,14 +90,6 @@ class TemperatureMonitor:
         """Read temperature with escalating recovery methods"""
         print('Reading temperature')
 
-        if self.sensor is None:
-            try:
-                self.sensor = W1ThermSensor()
-            except Exception as e:
-                self.consecutive_sensor_errors += 1
-                self.consecutive_errors.append(f'Error creating sensor instance: {traceback.format_exc()}')
-                raise
-
         if self.max_sensor_errors_before_reboot <= self.consecutive_sensor_errors and self.reboot_count <= self.max_reboots:
             print(f"Rebooting after {self.consecutive_sensor_errors} sensor failures")
             self.report_and_reboot_system('sensor')
@@ -114,6 +106,14 @@ class TemperatureMonitor:
             except Exception as e:
                 self.consecutive_sensor_errors += 1
                 self.consecutive_errors.append(f"Error after module reset: {traceback.format_exc()}")
+                raise
+
+        if self.sensor is None:
+            try:
+                self.sensor = W1ThermSensor()
+            except Exception as e:
+                self.consecutive_sensor_errors += 1
+                self.consecutive_errors.append(f'Error creating sensor instance: {traceback.format_exc()}')
                 raise
 
         if self.sensor is not None:
