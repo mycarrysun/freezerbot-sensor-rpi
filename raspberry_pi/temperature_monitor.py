@@ -92,24 +92,16 @@ class TemperatureMonitor:
 
         if self.sensor is None:
             try:
+                if self.consecutive_sensor_errors >= self.max_sensor_errors_before_modprobe:
+                    print(f"Resetting 1-Wire modules after {self.consecutive_sensor_errors} failures")
+                    subprocess.run(["/usr/sbin/modprobe", "-r", "w1_gpio", "w1_therm"])
+                    time.sleep(1)
+                    subprocess.run(["/usr/sbin/modprobe", "w1_gpio", "w1_therm"])
+                    time.sleep(2)  # Give system time to detect sensors
                 self.sensor = W1ThermSensor()
             except Exception as e:
                 self.consecutive_sensor_errors += 1
                 self.consecutive_errors.append(f'Error creating sensor instance: {traceback.format_exc()}')
-                self._check_for_reboot_condition('sensor')
-
-        if self.consecutive_sensor_errors >= self.max_sensor_errors_before_modprobe:
-            print(f"Resetting 1-Wire modules after {self.consecutive_sensor_errors} failures")
-            try:
-                subprocess.run(["/usr/sbin/modprobe", "-r", "w1_gpio", "w1_therm"])
-                time.sleep(1)
-                subprocess.run(["/usr/sbin/modprobe", "w1_gpio", "w1_therm"])
-                time.sleep(2)  # Give system time to detect sensors
-
-                self.sensor = W1ThermSensor()
-            except Exception as e:
-                self.consecutive_sensor_errors += 1
-                self.consecutive_errors.append(f"Error after module reset: {traceback.format_exc()}")
                 self._check_for_reboot_condition('sensor')
                 raise
 
