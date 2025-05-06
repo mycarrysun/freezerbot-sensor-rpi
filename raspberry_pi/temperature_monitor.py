@@ -259,7 +259,7 @@ class TemperatureMonitor:
         # Report critical network failure to API if possible
         try:
             self.consecutive_errors.append(
-                f"Critical {failure_type} failure triggering reboot #{self.reboot_count}. Total failures: {self.network_failure_count}")
+                f"Critical {failure_type} failure triggering reboot #{self.reboot_count}. Total network failures: {self.network_failure_count}. Sensor errors: {self.consecutive_sensor_errors}")
             self.report_consecutive_errors()
         except Exception:
             print("Failed to report network failure before reboot")
