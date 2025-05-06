@@ -90,10 +90,14 @@ class TemperatureMonitor:
         """Read temperature with escalating recovery methods"""
         print('Reading temperature')
 
-        if self.max_sensor_errors_before_reboot <= self.consecutive_sensor_errors and self.reboot_count <= self.max_reboots:
-            print(f"Rebooting after {self.consecutive_sensor_errors} sensor failures")
-            self.report_and_reboot_system('sensor')
-            raise
+        if self.sensor is None:
+            try:
+                self.sensor = W1ThermSensor()
+            except Exception as e:
+                self.consecutive_sensor_errors += 1
+                self.consecutive_errors.append(f'Error creating sensor instance: {traceback.format_exc()}')
+                self._check_for_reboot_condition('sensor')
+
         if self.consecutive_sensor_errors >= self.max_sensor_errors_before_modprobe:
             print(f"Resetting 1-Wire modules after {self.consecutive_sensor_errors} failures")
             try:
@@ -106,14 +110,7 @@ class TemperatureMonitor:
             except Exception as e:
                 self.consecutive_sensor_errors += 1
                 self.consecutive_errors.append(f"Error after module reset: {traceback.format_exc()}")
-                raise
-
-        if self.sensor is None:
-            try:
-                self.sensor = W1ThermSensor()
-            except Exception as e:
-                self.consecutive_sensor_errors += 1
-                self.consecutive_errors.append(f'Error creating sensor instance: {traceback.format_exc()}')
+                self._check_for_reboot_condition('sensor')
                 raise
 
         if self.sensor is not None:
@@ -124,7 +121,18 @@ class TemperatureMonitor:
             except Exception as e:
                 self.consecutive_sensor_errors += 1
                 self.consecutive_errors.append(f"Error reading from existing sensor: {traceback.format_exc()}")
+                self._check_for_reboot_condition('sensor')
                 raise
+
+        # not sure how this can happen but just in case
+        raise Exception("Unknown error getting temperature")
+
+    def _check_for_reboot_condition(self, failure_type):
+        """Check if we need to reboot the system based on consecutive error count"""
+        if self.consecutive_sensor_errors >= self.max_sensor_errors_before_reboot and self.reboot_count <= self.max_reboots:
+            print(f"Rebooting after {self.consecutive_sensor_errors} sensor failures")
+            self.report_and_reboot_system(failure_type)
+            raise Exception(f"Rebooting system due to {self.consecutive_sensor_errors} sensor failures")
 
     def run(self):
         """Main monitoring loop with resilient error handling"""
