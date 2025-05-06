@@ -94,10 +94,11 @@ class TemperatureMonitor:
             try:
                 self.sensor = W1ThermSensor()
             except Exception as e:
+                self.consecutive_sensor_errors += 1
                 self.consecutive_errors.append(f'Error creating sensor instance: {traceback.format_exc()}')
                 raise
 
-        if self.max_sensor_errors_before_reboot <= self.consecutive_sensor_errors <= self.max_reboots:
+        if self.max_sensor_errors_before_reboot <= self.consecutive_sensor_errors and self.reboot_count <= self.max_reboots:
             print(f"Rebooting after {self.consecutive_sensor_errors} sensor failures")
             self.report_and_reboot_system('sensor')
             raise
@@ -111,6 +112,7 @@ class TemperatureMonitor:
 
                 self.sensor = W1ThermSensor()
             except Exception as e:
+                self.consecutive_sensor_errors += 1
                 self.consecutive_errors.append(f"Error after module reset: {traceback.format_exc()}")
                 raise
 
