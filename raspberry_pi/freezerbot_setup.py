@@ -289,19 +289,29 @@ address=/#/192.168.4.1
         with open("/etc/dnsmasq.conf", "w") as f:
             f.write(dnsmasq_config)
 
-        # Restart services
-        subprocess.run(["/usr/bin/systemctl", "restart", "dnsmasq.service"])
-        subprocess.run(["/usr/bin/systemctl", "restart", "hostapd.service"])
+        for attempt in range(3):
+            try:
+                # Restart services
+                subprocess.run(["/usr/bin/systemctl", "restart", "dnsmasq.service"])
+                subprocess.run(["/usr/bin/systemctl", "restart", "hostapd.service"])
 
-        # Verify services are running
-        hostapd_status = subprocess.run(["/usr/bin/systemctl", "is-active", "hostapd"],
-                                        capture_output=True, text=True).stdout.strip()
-        dnsmasq_status = subprocess.run(["/usr/bin/systemctl", "is-active", "dnsmasq"],
-                                        capture_output=True, text=True).stdout.strip()
+                # Verify services are running
+                hostapd_status = subprocess.run(["/usr/bin/systemctl", "is-active", "hostapd"],
+                                                capture_output=True, text=True).stdout.strip()
+                dnsmasq_status = subprocess.run(["/usr/bin/systemctl", "is-active", "dnsmasq"],
+                                                capture_output=True, text=True).stdout.strip()
 
-        if hostapd_status != "active" or dnsmasq_status != "active":
-            self.led_control.set_state('error')
-            raise Exception(f"Failed to start services: hostapd={hostapd_status}, dnsmasq={dnsmasq_status}")
+                if hostapd_status == 'active' and dnsmasq_status == 'active':
+                    print(f'Hotspot {hotspot_name} started successfully')
+                    return
+                if hostapd_status != "active" or dnsmasq_status != "active":
+                    print(f'Attempt {attempt} not active: hostapd={hostapd_status}, dnsmasq={dnsmasq_status}')
+                    sleep(3)
+            except:
+                print(f'Attempt {attempt} starting dnsmasq and hostapd failed: {traceback.format_exc()}')
+
+        self.led_control.set_state('error')
+        raise Exception(f"Failed to start services hostapd and dnsmasq")
 
     def run(self):
         """Main entry point"""
@@ -318,6 +328,7 @@ address=/#/192.168.4.1
             except Exception as e:
                 print(f"Setup mode failed: {str(e)}")
                 self.led_control.set_state("error")
+                raise
         else:
             print("Device already configured, exiting setup mode")
             restart_in_sensor_mode()
@@ -336,6 +347,8 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         setup.cleanup()
         print("Setup terminated by user")
+        exit(0)
     except Exception as e:
         print(f"Error in setup: {str(e)}")
         GPIO.cleanup()
+        raise

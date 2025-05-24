@@ -1,11 +1,16 @@
 [Unit]
 Description=Freezerbot Setup Service
-After=network.target
+After=network.target NetworkManager.service
+Wants=NetworkManager.service
+Requires=network.target
+StartLimitBurst=3
+StartLimitIntervalSec=120
 
 [Service]
 ExecStart=/home/pi/freezerbot/.venv/bin/python /home/pi/freezerbot/raspberry_pi/freezerbot_setup.py
 WorkingDirectory=/home/pi/freezerbot
 Restart=on-failure
+RestartSec=10
 User=root
 Environment=PATH=/home/pi/freezerbot/.venv/bin:$PATH PYTHONUNBUFFERED=1
 
