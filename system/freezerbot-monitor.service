@@ -1,11 +1,14 @@
 [Unit]
 Description=Freezerbot Temperature Monitor
-After=network.target
+After=network.target NetworkManager.service
+StartLimitBurst=3
+StartLimitIntervalSec=300
 
 [Service]
 ExecStart=/home/pi/freezerbot/.venv/bin/python /home/pi/freezerbot/raspberry_pi/temperature_monitor.py
 WorkingDirectory=/home/pi/freezerbot
 Restart=on-failure
+RestartSec=60
 User=root
 Environment=PATH=/home/pi/freezerbot/.venv/bin:$PATH PYTHONUNBUFFERED=1
 
