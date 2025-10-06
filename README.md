@@ -24,6 +24,11 @@ Configuration of the OS is required for the hardware in this guide to work with 
     #!/usr/bin/env bash
     set -euo pipefail
     PATH="$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    if [ ! -d /home/pi/freezerbot ]
+    then
+      git clone https://github.com/mycarrysun/freezerbot-sensor-rpi.git /home/pi/freezerbot
+    fi
+    
     cd /home/pi/freezerbot
     if [ ! -f device_info.json ]
     then
