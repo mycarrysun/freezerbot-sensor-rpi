@@ -43,6 +43,13 @@ class TemperatureMonitor:
 
         self.validate_config()
 
+        # Set default marquee to show device name
+        try:
+            device_name = self.config.get_device_name()
+            self.display_control.set_default_marquee(device_name)
+        except Exception:
+            pass
+
     def validate_config(self):
         """Check for a valid config file"""
         if not self.config.configuration_exists:
@@ -252,6 +259,11 @@ class TemperatureMonitor:
                         possible_name = response_json.get('name')
                         if possible_name and self.config.config['device_name'] != possible_name:
                             self.config.save_device_name(possible_name)
+                            # Update the default marquee with new device name
+                            try:
+                                self.display_control.set_default_marquee(possible_name)
+                            except Exception:
+                                pass
                     else:
                         api_failure_count += 1
                         self.consecutive_errors.append(f'API error: {response.status_code} - {response.text}')

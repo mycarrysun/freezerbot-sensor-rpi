@@ -27,6 +27,14 @@ class FreezerBotSetup:
         self.display_control = DisplayControl()
         self.pisugar = PiSugarMonitor()
 
+        # Set default marquee to show device name if available
+        try:
+            if 'device_name' in self.config.config:
+                device_name = self.config.get_device_name()
+                self.display_control.set_default_marquee(device_name)
+        except Exception:
+            pass
+
         # Initialize Flask application
         self.app = Flask(__name__,
                          static_url_path='',

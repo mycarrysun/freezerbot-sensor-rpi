@@ -58,7 +58,8 @@ class DisplayControl:
         self._draw_lock = threading.Lock()
 
         # Marquee state
-        self.marquee_text: Optional[str] = None
+        self.default_marquee: Optional[str] = None  # Default message (e.g., device name)
+        self.marquee_text: Optional[str] = None  # Custom override message
         self.marquee_offset: int = 0
         self.marquee_speed_px: int = 1  # pixels per frame
         self._marquee_thread: Optional[threading.Thread] = None
@@ -150,6 +151,18 @@ class DisplayControl:
         self.wifi_connected = connected
         self._refresh_display()
 
+    def set_default_marquee(self, text: Optional[str]):
+        """Set the default marquee message (e.g., device name) that shows when no custom message is active"""
+        if not self.display_available:
+            return
+        self.default_marquee = text
+        # Start marquee thread if not already running
+        if text and (self._marquee_thread is None or not self._marquee_thread.is_alive()):
+            self._marquee_stop.clear()
+            self._marquee_thread = threading.Thread(target=self._marquee_loop, daemon=True)
+            self._marquee_thread.start()
+        self._refresh_display()
+
     def _refresh_display(self):
         """Redraw the entire display with current state"""
         if not self.display_available or self.display is None:
@@ -178,15 +191,11 @@ class DisplayControl:
                     temp_text = f"{self.temperature_f:.1f}F"
                     self._draw_text(2, 0, temp_text, font=self.temp_font)
 
-                # Draw serial number only when marquee is not active
-                if not self.marquee_text:
-                    last4 = self.serial[-4:] if len(self.serial) >= 4 else self.serial
-                    serial_text = f"Sr {last4}"
-                    self._draw_text(2, 16, serial_text)
-
-                # Marquee at the bottom when enabled; hide serial during marquee
-                if self.marquee_text:
-                    msg = self.marquee_text
+                # Always show marquee at the bottom (custom message or default device name)
+                # Prioritize custom marquee_text over default_marquee
+                active_marquee = self.marquee_text if self.marquee_text else self.default_marquee
+                if active_marquee:
+                    msg = active_marquee
                     # Measure text width
                     try:
                         text_w = int(self.draw.textlength(msg, font=self.base_font))
@@ -266,28 +275,36 @@ class DisplayControl:
             self.clear_marquee()
 
     def clear_marquee(self):
-        """Disable the marquee message and stop the animation thread."""
+        """Clear custom marquee message and revert to default marquee (device name)."""
         self.marquee_text = None
-        self._marquee_stop.set()
-        if self._marquee_thread is not None:
-            self._marquee_thread.join(timeout=0.5)
-            self._marquee_thread = None
+        # Only stop the animation thread if there's no default marquee to show
+        if not self.default_marquee:
+            self._marquee_stop.set()
+            if self._marquee_thread is not None:
+                self._marquee_thread.join(timeout=0.5)
+                self._marquee_thread = None
+        else:
+            # Reset offset for smooth transition back to default
+            self.marquee_offset = 128
+            self._refresh_display()
 
     def _marquee_loop(self):
         """Background loop to scroll the marquee while enabled."""
         try:
             import time
             while not self._marquee_stop.is_set():
-                if not self.marquee_text:
+                # Determine which marquee to display (custom or default)
+                active_marquee = self.marquee_text if self.marquee_text else self.default_marquee
+                if not active_marquee:
                     # Nothing to show; pause and continue
                     time.sleep(0.2)
                     continue
                 # Measure text width
                 try:
-                    text_w = int(self.draw.textlength(self.marquee_text, font=self.base_font or self.small_font))
+                    text_w = int(self.draw.textlength(active_marquee, font=self.base_font or self.small_font))
                 except Exception:
                     fnt = self.base_font or self.small_font
-                    text_w = fnt.getsize(self.marquee_text)[0] if hasattr(fnt, 'getsize') else len(self.marquee_text) * 6
+                    text_w = fnt.getsize(active_marquee)[0] if hasattr(fnt, 'getsize') else len(active_marquee) * 6
                 gap = 16  # pixels between repeats
 
                 # Update position

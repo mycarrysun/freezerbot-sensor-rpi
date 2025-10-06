@@ -41,6 +41,9 @@ class Config:
         self.config['device_name'] = new_name
         self.save_new_config(self.config)
 
+    def get_device_name(self):
+        return self.config['device_name']
+
     def clear_creds_from_config(self):
         if 'email' in self.config:
             del self.config['email']
