@@ -297,6 +297,14 @@ class DisplayControl:
     def clear_critical_message(self):
         """Clear the critical message flag to allow normal display updates to resume"""
         self.showing_critical_message = False
+        
+        # Restart marquee thread if there's an active marquee message
+        active_marquee = self.marquee_text if self.marquee_text else self.default_marquee
+        if active_marquee and (self._marquee_thread is None or not self._marquee_thread.is_alive()):
+            self._marquee_stop.clear()
+            self._marquee_thread = threading.Thread(target=self._marquee_loop, daemon=True)
+            self._marquee_thread.start()
+        
         self._refresh_display()
 
     def show_api_error_message(self, status_code: int, response_text: str):
