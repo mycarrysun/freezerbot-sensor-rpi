@@ -130,6 +130,11 @@ class TemperatureMonitor:
             try:
                 temperature = self.sensor.get_temperature()
                 self.consecutive_sensor_errors = 0
+                # Clear critical message on successful read (sensor recovered)
+                try:
+                    self.display_control.clear_critical_message()
+                except Exception:
+                    pass
                 return temperature
             except Exception as e:
                 self.consecutive_sensor_errors += 1

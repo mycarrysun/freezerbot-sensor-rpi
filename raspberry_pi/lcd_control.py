@@ -74,6 +74,7 @@ class DisplayControl:
         self.wifi_strength = 0  # WiFi signal strength 0-100
         self.api_status = False  # True if successfully sending to API
         self.error_status = False  # True if there are errors/issues
+        self.showing_critical_message = False  # True when showing persistent critical message
         self.serial = self._get_serial_number()
 
         if self.display_available:
@@ -290,7 +291,13 @@ class DisplayControl:
 
     def show_bad_probe_message(self):
         """Display 'Bad probe / Contact Support' message when temperature sensor errors are detected"""
+        self.showing_critical_message = True
         self._show_two_line_message("Bad probe", "Contact Support")
+
+    def clear_critical_message(self):
+        """Clear the critical message flag to allow normal display updates to resume"""
+        self.showing_critical_message = False
+        self._refresh_display()
 
     def show_api_error_message(self, status_code: int, response_text: str):
         """Display API error with status code and response text in a marquee
@@ -351,6 +358,10 @@ class DisplayControl:
     def _refresh_display(self):
         """Redraw the entire display with current state"""
         if not self.display_available or self.display is None:
+            return
+        
+        # Don't refresh if showing a critical message (like bad probe error)
+        if self.showing_critical_message:
             return
 
         try:
