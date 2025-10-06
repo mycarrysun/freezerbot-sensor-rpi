@@ -207,13 +207,13 @@ class DisplayControl:
                 self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
 
                 # Top line: "Setup Mode" in large font (16px)
-                setup_text = "Setup Mode"
+                setup_text = "Setup Mode Wifi"
                 self._draw_text(2, 0, setup_text, font=self.temp_font)
 
                 # Bottom line: "Wifi: Freezerbot-Setup-XXXX" in base font (8px)
                 # Get last 4 digits of serial number
                 serial_suffix = self.serial[-4:] if len(self.serial) >= 4 else self.serial
-                wifi_text = f"Wifi: Freezerbot-Setup-{serial_suffix}"
+                wifi_text = f"Freezerbot-Setup-{serial_suffix}"
                 self._draw_text(2, 18, wifi_text, font=self.base_font)
 
                 # Push to display
