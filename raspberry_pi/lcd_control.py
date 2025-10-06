@@ -61,7 +61,7 @@ class DisplayControl:
         self.default_marquee: Optional[str] = None  # Default message (e.g., device name)
         self.marquee_text: Optional[str] = None  # Custom override message
         self.marquee_offset: int = 0
-        self.marquee_speed_px: int = 1  # pixels per frame
+        self.marquee_speed_px: int = 2  # pixels per frame
         self._marquee_thread: Optional[threading.Thread] = None
         self._marquee_stop = threading.Event()
 
@@ -245,7 +245,7 @@ class DisplayControl:
                         text_w = int(self.draw.textlength(msg, font=self.base_font))
                     except Exception:
                         text_w = self.base_font.getsize(msg)[0] if hasattr(self.base_font, 'getsize') else len(msg) * 6
-                    gap = 16  # pixels between repeats
+                    gap = 8  # pixels between repeats
                     y = 16  # bottom half of the 32px display
                     x = self.marquee_offset
                     # Draw copies for seamless looping
@@ -366,9 +366,11 @@ class DisplayControl:
         if not self.display_available:
             return
         if text:
+            # Only reset offset if text has changed
+            if self.marquee_text != text:
+                self.marquee_offset = 0  # start from the left edge
             self.marquee_text = text
             self.marquee_speed_px = max(1, int(speed_px))
-            self.marquee_offset = 128  # start from the right edge
             if self._marquee_thread is None or not self._marquee_thread.is_alive():
                 self._marquee_stop.clear()
                 self._marquee_thread = threading.Thread(target=self._marquee_loop, daemon=True)
@@ -387,7 +389,7 @@ class DisplayControl:
                 self._marquee_thread = None
         else:
             # Reset offset for smooth transition back to default
-            self.marquee_offset = 128
+            self.marquee_offset = 0
             self._refresh_display()
 
     def _marquee_loop(self):
@@ -407,12 +409,12 @@ class DisplayControl:
                 except Exception:
                     fnt = self.base_font or self.small_font
                     text_w = fnt.getsize(active_marquee)[0] if hasattr(fnt, 'getsize') else len(active_marquee) * 6
-                gap = 16  # pixels between repeats
+                gap = 8  # pixels between repeats
 
                 # Update position
                 self.marquee_offset -= self.marquee_speed_px
                 if self.marquee_offset < -(text_w + gap):
-                    self.marquee_offset = 128
+                    self.marquee_offset = 0
 
                 # Refresh display
                 self._refresh_display()
