@@ -180,12 +180,15 @@ class TemperatureMonitor:
 
                     # Update OLED with WiFi and battery status while offline
                     try:
-                        self.display_control.update_wifi(connected_to_wifi())
+                        self.display_control.update_wifi(connected_to_wifi(), get_wifi_signal_strength())
                         self.display_control.update_battery(
                             self.pisugar.get_battery_level(),
                             self.pisugar.is_charging(),
                             self.pisugar.is_power_plugged(),
                         )
+                        # No API communication during network failure
+                        self.display_control.update_api_status(False)
+                        # Don't show error icon for network issues - WiFi icon already indicates this
                     except Exception:
                         pass
                     continue
@@ -203,9 +206,9 @@ class TemperatureMonitor:
                 try:
                     self.obtain_api_token()
 
-                    # Update WiFi indicator as connected
+                    # Update WiFi indicator as connected with signal strength
                     try:
-                        self.display_control.update_wifi(True)
+                        self.display_control.update_wifi(True, get_wifi_signal_strength())
                     except Exception:
                         pass
 
@@ -255,6 +258,14 @@ class TemperatureMonitor:
                         self.led_control.set_state('running')
                         self.report_consecutive_errors()
                         api_failure_count = 0
+                        # Update LCD status: API is sending successfully, no errors
+                        try:
+                            self.display_control.update_api_status(True)
+                            self.display_control.update_error_status(False)
+                            # Clear any error marquee message (e.g., from 401), return to default
+                            self.display_control.set_marquee(None)
+                        except Exception:
+                            pass
                         response_json = response.json()
                         possible_name = response_json.get('name')
                         if possible_name and self.config.config['device_name'] != possible_name:
@@ -268,6 +279,19 @@ class TemperatureMonitor:
                         api_failure_count += 1
                         self.consecutive_errors.append(f'API error: {response.status_code} - {response.text}')
 
+                        # Update LCD status: API failed
+                        try:
+                            self.display_control.update_api_status(False)
+                            # Only show error icon for 401 (invalid credentials)
+                            if response.status_code == 401:
+                                self.display_control.update_error_status(True)
+                                self.display_control.set_marquee("Invalid Freezerbot login, please enter Setup Mode and fix")
+                            else:
+                                # Other API errors are indicated by API icon, not error icon
+                                self.display_control.update_error_status(False)
+                        except Exception:
+                            pass
+
                         # Only change LED state after persistent API failures
                         if api_failure_count >= 3:
                             self.led_control.set_state("error")
@@ -276,6 +300,12 @@ class TemperatureMonitor:
                     print(f"Error in API communication: {traceback.format_exc()}")
                     self.consecutive_errors.append(traceback.format_exc())
                     api_failure_count += 1
+
+                    # Update LCD status: API communication failed (indicated by API icon, not error icon)
+                    try:
+                        self.display_control.update_api_status(False)
+                    except Exception:
+                        pass
 
                     # Only change LED state after persistent API failures
                     if api_failure_count >= 3:
@@ -288,6 +318,11 @@ class TemperatureMonitor:
                 print(f"Error in main loop: {traceback.format_exc()}")
                 self.consecutive_errors.append(traceback.format_exc())
                 self.led_control.set_state("error")
+                # Update LCD status: show error
+                try:
+                    self.display_control.update_error_status(True)
+                except Exception:
+                    pass
                 try:
                     self.report_consecutive_errors()
                 except Exception:

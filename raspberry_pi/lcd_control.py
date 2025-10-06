@@ -71,6 +71,9 @@ class DisplayControl:
         self.is_charging = False
         self.is_plugged_in = False
         self.wifi_connected = False
+        self.wifi_strength = 0  # WiFi signal strength 0-100
+        self.api_status = False  # True if successfully sending to API
+        self.error_status = False  # True if there are errors/issues
         self.serial = self._get_serial_number()
 
         if self.display_available:
@@ -146,9 +149,33 @@ class DisplayControl:
         self.is_plugged_in = plugged_in
         self._refresh_display()
 
-    def update_wifi(self, connected: bool):
-        """Update WiFi connection status display"""
+    def update_wifi(self, connected: bool, signal_strength: int = 0):
+        """Update WiFi connection status and signal strength display
+        
+        Args:
+            connected: Whether WiFi is connected
+            signal_strength: Signal strength as percentage (0-100)
+        """
         self.wifi_connected = connected
+        self.wifi_strength = signal_strength
+        self._refresh_display()
+
+    def update_api_status(self, sending: bool):
+        """Update API communication status
+        
+        Args:
+            sending: True if successfully sending data to API
+        """
+        self.api_status = sending
+        self._refresh_display()
+
+    def update_error_status(self, has_error: bool):
+        """Update error/issue status
+        
+        Args:
+            has_error: True if there are errors or issues
+        """
+        self.error_status = has_error
         self._refresh_display()
 
     def set_default_marquee(self, text: Optional[str]):
@@ -176,7 +203,7 @@ class DisplayControl:
                 # Top-right: battery and Wi‑Fi side-by-side
                 battery_x = 128 - 22 - 1  # battery body(20 incl. terminal) + 1px margin
                 battery_y = 0
-                wifi_x = battery_x - 12  # leave ~2px gap within icon function
+                wifi_x = battery_x - 14  # leave ~2px gap within icon function
                 wifi_y = 0
 
                 # Draw battery icon only (no percent text or + symbol)
@@ -184,7 +211,19 @@ class DisplayControl:
                     self._draw_battery_icon(battery_x, battery_y, self.battery_percent, self.is_charging, self.is_plugged_in)
 
                 # Draw Wi‑Fi icon
-                self._draw_wifi_icon(wifi_x, wifi_y, self.wifi_connected)
+                self._draw_wifi_icon(wifi_x, wifi_y, self.wifi_connected, self.wifi_strength)
+
+                # Draw new icons in the middle area (between temperature and battery/wifi)
+                # Error icon (left of API icon)
+                error_x = wifi_x - 18  # 6px icon + 12px gap
+                error_y = 0
+                if self.error_status:
+                    self._draw_error_icon(error_x, error_y, self.error_status)
+
+                # API icon (left of error icon)
+                api_x = error_x - 12  # 8px icon + 4px gap
+                api_y = 0
+                self._draw_api_icon(api_x, api_y, self.api_status)
 
                 # Draw temperature (left side, prominent) at 16px
                 if self.temperature_f is not None:
@@ -238,26 +277,88 @@ class DisplayControl:
             if fill_width > 0:
                 self.draw.rectangle((x + 1, y + 1, x + 1 + fill_width, y + 6), outline=255, fill=255)
 
-    def _draw_wifi_icon(self, x: int, y: int, connected: bool):
-        """Draw Wi‑Fi status as ascending RSSI bars; X overlay when disconnected."""
+    def _draw_wifi_icon(self, x: int, y: int, connected: bool, signal_strength: int = 0):
+        """Draw Wi‑Fi status as ascending RSSI bars based on signal strength.
+        
+        Args:
+            x: X position
+            y: Y position
+            connected: Whether WiFi is connected
+            signal_strength: Signal strength 0-100 (determines number of bars)
+        """
         # Icon size ~12x10 (fits next to battery)
         base_y = y + 9  # bottom baseline
         bar_w = 2
         spacing = 1
         heights = [3, 5, 7, 9]
-        # Clear area first (optional if background already cleared)
-        # Draw bars
-        for i, h in enumerate(heights):
-            left = x + i * (bar_w + spacing)
-            if connected:
-                self.draw.rectangle((left, base_y - h, left + bar_w - 1, base_y), fill=255)
-            else:
-                # outline when disconnected for subtle look
-                self.draw.rectangle((left, base_y - h, left + bar_w - 1, base_y), outline=255, fill=0)
+        
         if not connected:
+            # Draw outline bars when disconnected
+            for i, h in enumerate(heights):
+                left = x + i * (bar_w + spacing)
+                self.draw.rectangle((left, base_y - h, left + bar_w - 1, base_y), outline=255, fill=0)
             # X overlay
             self.draw.line((x, y, x + 11, y + 9), fill=255)
             self.draw.line((x + 11, y, x, y + 9), fill=255)
+        else:
+            # Determine number of bars to fill based on signal strength
+            # 0-25% = 1 bar, 26-50% = 2 bars, 51-75% = 3 bars, 76-100% = 4 bars
+            if signal_strength <= 25:
+                filled_bars = 1
+            elif signal_strength <= 50:
+                filled_bars = 2
+            elif signal_strength <= 75:
+                filled_bars = 3
+            else:
+                filled_bars = 4
+            
+            # Draw bars
+            for i, h in enumerate(heights):
+                left = x + i * (bar_w + spacing)
+                if i < filled_bars:
+                    # Filled bar
+                    self.draw.rectangle((left, base_y - h, left + bar_w - 1, base_y), fill=255)
+                else:
+                    # Outline bar (unfilled)
+                    self.draw.rectangle((left, base_y - h, left + bar_w - 1, base_y), outline=255, fill=0)
+
+    def _draw_api_icon(self, x: int, y: int, sending: bool):
+        """Draw API status icon as an upward arrow (upload symbol).
+        
+        Args:
+            x: X position
+            y: Y position
+            sending: True if successfully sending to API
+        """
+        # Icon size ~8x10 (compact upload arrow)
+        if sending:
+            # Arrow shaft (vertical line)
+            self.draw.rectangle((x + 3, y + 3, x + 4, y + 9), fill=255)
+            # Arrow head (triangle pointing up)
+            self.draw.line((x + 3, y + 3, x, y + 6), fill=255)
+            self.draw.line((x + 4, y + 3, x + 7, y + 6), fill=255)
+            # Base line
+            self.draw.line((x, y + 9, x + 7, y + 9), fill=255)
+        else:
+            # Outline version when not sending
+            self.draw.rectangle((x + 3, y + 4, x + 4, y + 8), outline=255, fill=0)
+            self.draw.line((x + 3, y + 4, x + 1, y + 6), fill=255)
+            self.draw.line((x + 4, y + 4, x + 6, y + 6), fill=255)
+
+    def _draw_error_icon(self, x: int, y: int, has_error: bool):
+        """Draw error/issue icon as an exclamation mark.
+        
+        Args:
+            x: X position
+            y: Y position
+            has_error: True if there are errors
+        """
+        # Icon size ~6x10 (exclamation mark)
+        if has_error:
+            # Exclamation mark stem
+            self.draw.rectangle((x + 2, y, x + 3, y + 6), fill=255)
+            # Exclamation mark dot
+            self.draw.rectangle((x + 2, y + 8, x + 3, y + 9), fill=255)
 
     def set_marquee(self, text: Optional[str], speed_px: int = 1):
         """Set a scrolling marquee message at the bottom. Pass None or '' to disable."""

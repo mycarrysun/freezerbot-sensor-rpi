@@ -23,13 +23,13 @@ def get_wifi_signal_strength() -> int:
         # First check if connected
         if not connected_to_wifi():
             return -100
-        
+
         # Get signal strength using nmcli
         result = subprocess.run(
             ["/usr/bin/nmcli", "-t", "-f", "SIGNAL", "device", "wifi", "list", "--rescan", "no"],
             capture_output=True, text=True, timeout=2
         )
-        
+
         if result.returncode == 0 and result.stdout.strip():
             # Get the first line (current connection)
             lines = result.stdout.strip().split('\n')
@@ -40,7 +40,7 @@ def get_wifi_signal_strength() -> int:
                     return max(0, min(100, signal)) * -1  # Clamp to 0-100
                 except ValueError:
                     pass
-        
+
         # Fallback: if connected but can't get signal, return a default value
         return -50
     except Exception as e:
@@ -125,20 +125,20 @@ def get_current_wifi_ssid() -> str:
             ["/usr/bin/nmcli", "-t", "-f", "NAME,DEVICE", "connection", "show", "--active"],
             capture_output=True, text=True, timeout=2
         )
-        
+
         if result.returncode == 0 and result.stdout.strip():
             # Look for wlan0 connection
             for line in result.stdout.strip().split('\n'):
                 if ':wlan0' in line:
                     ssid = line.split(':')[0]
                     return ssid
-        
+
         # Fallback: try getting SSID from wifi list
         result = subprocess.run(
             ["/usr/bin/nmcli", "-t", "-f", "SSID,SIGNAL", "device", "wifi", "list", "--rescan", "no"],
             capture_output=True, text=True, timeout=2
         )
-        
+
         if result.returncode == 0 and result.stdout.strip():
             # Get the first line (current connection should have highest signal)
             lines = result.stdout.strip().split('\n')
@@ -148,7 +148,7 @@ def get_current_wifi_ssid() -> str:
                     ssid = parts[0].strip()
                     if ssid:
                         return ssid
-        
+
         return None
     except Exception as e:
         return None
@@ -210,13 +210,13 @@ def get_mac_address() -> str:
             mac = result.stdout.strip().split('GENERAL.HWADDR:')[0]
             if mac:
                 return mac
-        
+
         # Fallback: use ip addr command
         result = subprocess.run(
             ["/bin/ip", "addr", "show", "wlan0"],
             capture_output=True, text=True, timeout=2
         )
-        
+
         if result.returncode == 0 and result.stdout.strip():
             for line in result.stdout.strip().split('\n'):
                 if 'link/ether' in line:
@@ -225,7 +225,7 @@ def get_mac_address() -> str:
                     for part in parts:
                         if ':' in part and len(part) == 17:  # MAC address format
                             return part
-        
+
         return None
     except Exception as e:
         return None
@@ -241,21 +241,21 @@ def get_configured_wifi_networks() -> list:
         # Get the base directory (same logic as Config class)
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         config_file = os.path.join(base_dir, 'config.json')
-        
+
         if not os.path.exists(config_file):
             return []
-        
+
         with open(config_file, 'r') as f:
             config = json.load(f)
-        
+
         networks = config.get('networks', [])
         ssids = []
-        
+
         for network in networks:
             ssid = network.get('ssid')
             if ssid:
                 ssids.append(ssid)
-        
+
         return ssids
     except Exception as e:
         return []
