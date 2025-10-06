@@ -200,11 +200,20 @@ class DisplayControl:
                 # Clear image buffer
                 self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
 
-                # Top-right: battery and Wi‑Fi side-by-side
+                # Top-right: battery at far right
                 battery_x = 128 - 22 - 1  # battery body(20 incl. terminal) + 1px margin
                 battery_y = 0
-                wifi_x = battery_x - 14  # leave ~2px gap within icon function
+
+                # Icon order from left to right: error, API, WiFi, battery
+                # Calculate positions from right to left
+                wifi_x = battery_x - 14  # WiFi: 12px icon + 2px gap
                 wifi_y = 0
+                
+                api_x = wifi_x - 16  # API: 12px icon + 4px gap
+                api_y = 0
+                
+                error_x = api_x - 12  # Error: 6px icon + 6px gap
+                error_y = 0
 
                 # Draw battery icon only (no percent text or + symbol)
                 if self.battery_percent is not None:
@@ -213,17 +222,13 @@ class DisplayControl:
                 # Draw Wi‑Fi icon
                 self._draw_wifi_icon(wifi_x, wifi_y, self.wifi_connected, self.wifi_strength)
 
-                # Draw new icons in the middle area (between temperature and battery/wifi)
-                # Error icon (left of API icon)
-                error_x = wifi_x - 18  # 6px icon + 12px gap
-                error_y = 0
+                # Draw API icon (only when sending)
+                if self.api_status:
+                    self._draw_api_icon(api_x, api_y, self.api_status)
+
+                # Draw error icon (only when there's an error)
                 if self.error_status:
                     self._draw_error_icon(error_x, error_y, self.error_status)
-
-                # API icon (left of error icon)
-                api_x = error_x - 12  # 8px icon + 4px gap
-                api_y = 0
-                self._draw_api_icon(api_x, api_y, self.api_status)
 
                 # Draw temperature (left side, prominent) at 16px
                 if self.temperature_f is not None:
@@ -324,26 +329,22 @@ class DisplayControl:
 
     def _draw_api_icon(self, x: int, y: int, sending: bool):
         """Draw API status icon as an upward arrow (upload symbol).
+        Only draws when actively sending to API for clearer status indication.
         
         Args:
             x: X position
             y: Y position
             sending: True if successfully sending to API
         """
-        # Icon size ~8x10 (compact upload arrow)
+        # Icon size ~12x12 (larger, more visible upload arrow)
         if sending:
-            # Arrow shaft (vertical line)
-            self.draw.rectangle((x + 3, y + 3, x + 4, y + 9), fill=255)
+            # Arrow shaft (vertical line, thicker)
+            self.draw.rectangle((x + 5, y + 4, x + 6, y + 11), fill=255)
             # Arrow head (triangle pointing up)
-            self.draw.line((x + 3, y + 3, x, y + 6), fill=255)
-            self.draw.line((x + 4, y + 3, x + 7, y + 6), fill=255)
-            # Base line
-            self.draw.line((x, y + 9, x + 7, y + 9), fill=255)
-        else:
-            # Outline version when not sending
-            self.draw.rectangle((x + 3, y + 4, x + 4, y + 8), outline=255, fill=0)
-            self.draw.line((x + 3, y + 4, x + 1, y + 6), fill=255)
-            self.draw.line((x + 4, y + 4, x + 6, y + 6), fill=255)
+            self.draw.line((x + 5, y + 4, x + 1, y + 8), fill=255)
+            self.draw.line((x + 6, y + 4, x + 10, y + 8), fill=255)
+            self.draw.line((x + 2, y + 7, x + 5, y + 4), fill=255)
+            self.draw.line((x + 6, y + 4, x + 9, y + 7), fill=255)
 
     def _draw_error_icon(self, x: int, y: int, has_error: bool):
         """Draw error/issue icon as an exclamation mark.
