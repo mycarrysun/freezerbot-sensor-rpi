@@ -10,6 +10,8 @@ from flask import Flask, request, render_template, redirect, jsonify
 from config import Config, clear_nm_connections
 from led_control import LedControl
 from restarts import restart_in_sensor_mode
+from lcd_control import DisplayControl
+from battery import PiSugarMonitor
 
 
 class FreezerBotSetup:
@@ -20,6 +22,10 @@ class FreezerBotSetup:
 
         # Initialize LED control
         self.led_control = LedControl()
+
+        # Initialize OLED display and battery monitor (safe no-op if hardware unavailable)
+        self.display_control = DisplayControl()
+        self.pisugar = PiSugarMonitor()
 
         # Initialize Flask application
         self.app = Flask(__name__,
@@ -323,6 +329,17 @@ address=/#/192.168.4.1
 
                 self.led_control.set_state("setup")
 
+                # Update OLED to reflect setup mode (WiFi AP/disconnected) and current battery
+                try:
+                    self.display_control.update_wifi(False)
+                    self.display_control.update_battery(
+                        self.pisugar.get_battery_level(),
+                        self.pisugar.is_charging(),
+                        self.pisugar.is_power_plugged(),
+                    )
+                except Exception:
+                    pass
+
                 # Start the web server only if hotspot is successfully created
                 self.app.run(host="0.0.0.0", port=80)
             except Exception as e:
@@ -335,6 +352,10 @@ address=/#/192.168.4.1
 
     def cleanup(self):
         """Clean up GPIO on exit"""
+        try:
+            self.display_control.cleanup()
+        except Exception:
+            pass
         self.led_control.cleanup()
         GPIO.cleanup()
 

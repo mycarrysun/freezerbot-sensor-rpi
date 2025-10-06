@@ -13,9 +13,10 @@ from freezerbot_setup import FreezerBotSetup
 from config import Config
 from battery import PiSugarMonitor
 from network import test_internet_connectivity, load_network_status, save_network_status, reset_network_status, \
-    get_current_wifi_ssid, get_wifi_signal_strength, get_ip_address, get_mac_address, get_configured_wifi_networks
+    get_current_wifi_ssid, get_wifi_signal_strength, get_ip_address, get_mac_address, get_configured_wifi_networks, connected_to_wifi
 from device_info import DeviceInfo
 from restarts import restart_in_setup_mode
+from lcd_control import DisplayControl
 
 
 class TemperatureMonitor:
@@ -36,6 +37,9 @@ class TemperatureMonitor:
         self.consecutive_sensor_errors = 0
         self.max_sensor_errors_before_modprobe = 3
         self.max_sensor_errors_before_reboot = 10
+
+        # Initialize display controller (safe no-op if hardware unavailable)
+        self.display_control = DisplayControl()
 
         self.validate_config()
 
@@ -167,6 +171,16 @@ class TemperatureMonitor:
                             self.consecutive_errors.append(
                                 f"Excessive network failures ({self.network_failure_count}) after {self.reboot_count} reboots. Continuing without further reboots.")
 
+                    # Update OLED with WiFi and battery status while offline
+                    try:
+                        self.display_control.update_wifi(connected_to_wifi())
+                        self.display_control.update_battery(
+                            self.pisugar.get_battery_level(),
+                            self.pisugar.is_charging(),
+                            self.pisugar.is_power_plugged(),
+                        )
+                    except Exception:
+                        pass
                     continue
 
                 # Reset network failure counter if we have internet
@@ -182,18 +196,43 @@ class TemperatureMonitor:
                 try:
                     self.obtain_api_token()
 
+                    # Update WiFi indicator as connected
+                    try:
+                        self.display_control.update_wifi(True)
+                    except Exception:
+                        pass
+
                     temperature = self.read_temperature()
+
+                    # Update temperature on OLED
+                    try:
+                        self.display_control.update_temperature(temperature)
+                    except Exception:
+                        pass
+
+                    # Get battery readings once to avoid redundant calls and update OLED
+                    battery_level = self.pisugar.get_battery_level()
+                    battery_amps = self.pisugar.get_current()
+                    battery_volts = self.pisugar.get_voltage()
+                    is_charging = self.pisugar.is_charging()
+                    is_plugged_in = self.pisugar.is_power_plugged()
+                    is_allowed_to_charge = self.pisugar.is_charging_allowed()
+
+                    try:
+                        self.display_control.update_battery(battery_level, is_charging, is_plugged_in)
+                    except Exception:
+                        pass
 
                     payload = {
                         "degrees_c": temperature,
                         "cpu_degrees_c": CPUTemperature().temperature,
                         "taken_at": datetime.utcnow().isoformat() + 'Z',
-                        'battery_level': self.pisugar.get_battery_level(),
-                        'battery_amps': self.pisugar.get_current(),
-                        'battery_volts': self.pisugar.get_voltage(),
-                        'is_charging': self.pisugar.is_charging(),
-                        'is_plugged_in': self.pisugar.is_power_plugged(),
-                        'is_allowed_to_charge': self.pisugar.is_charging_allowed(),
+                        'battery_level': battery_level,
+                        'battery_amps': battery_amps,
+                        'battery_volts': battery_volts,
+                        'is_charging': is_charging,
+                        'is_plugged_in': is_plugged_in,
+                        'is_allowed_to_charge': is_allowed_to_charge,
                         'wifi_ssid': get_current_wifi_ssid(),
                         'wifi_signal_strength': get_wifi_signal_strength(),
                         'ip_address': get_ip_address(),
@@ -274,6 +313,10 @@ class TemperatureMonitor:
 
     def cleanup(self):
         """Clean up GPIO on exit"""
+        try:
+            self.display_control.cleanup()
+        except Exception:
+            pass
         self.led_control.cleanup()
         GPIO.cleanup()
 
