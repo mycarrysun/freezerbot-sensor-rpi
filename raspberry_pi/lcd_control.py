@@ -190,90 +190,83 @@ class DisplayControl:
             self._marquee_thread.start()
         self._refresh_display()
 
-    def show_entering_setup_message(self):
-        """Display 'Entering setup' message when transitioning to setup mode"""
+    def _stop_marquee(self):
+        """Stop the marquee animation if it's currently running"""
+        self._marquee_stop.set()
+        if self._marquee_thread is not None:
+            self._marquee_thread.join(timeout=0.5)
+            self._marquee_thread = None
+
+    def _show_two_line_message(self, top_line: str, bottom_line: str):
+        """Display a two-line message with top line in large font and bottom line in base font
+        
+        Args:
+            top_line: Text for the top line (will use temp_font - 16px)
+            bottom_line: Text for the bottom line (will use base_font - 8px)
+        """
         if not self.display_available or self.display is None:
             return
 
         try:
-            # Stop marquee animation if running
-            self._marquee_stop.set()
-            if self._marquee_thread is not None:
-                self._marquee_thread.join(timeout=0.5)
-                self._marquee_thread = None
+            self._stop_marquee()
 
             with self._draw_lock:
                 # Clear image buffer
                 self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
 
-                # Center text vertically: "Entering setup" in large font (16px)
-                self._draw_text(2, 8, "Entering setup", font=self.temp_font)
+                # Top line: large font (16px) at position (0, 0)
+                self._draw_text(0, 0, top_line, font=self.temp_font)
+
+                # Bottom line: base font (8px) at position (0, 18)
+                self._draw_text(0, 18, bottom_line, font=self.base_font)
 
                 # Push to display
                 self.display.image(self.image)
                 self.display.show()
 
-        except Exception:
-            print(f"Error showing entering setup message: {traceback.format_exc()}")
+        except Exception as e:
+            print(f"Error showing two-line message: {traceback.format_exc()}")
+
+    def _show_centered_message(self, message: str):
+        """Display a single-line centered message in large font
+        
+        Args:
+            message: Text to display
+        """
+        if not self.display_available or self.display is None:
+            return
+
+        try:
+            self._stop_marquee()
+
+            with self._draw_lock:
+                # Clear image buffer
+                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
+
+                # Center text vertically in large font (16px) at position (0, 8)
+                self._draw_text(0, 8, message, font=self.temp_font)
+
+                # Push to display
+                self.display.image(self.image)
+                self.display.show()
+
+        except Exception as e:
+            print(f"Error showing centered message: {traceback.format_exc()}")
+
+    def show_entering_setup_message(self):
+        """Display 'Entering setup' message when transitioning to setup mode"""
+        self._show_centered_message("Entering setup")
 
     def show_setup_mode(self):
         """Display setup mode screen with WiFi hotspot information"""
-        if not self.display_available or self.display is None:
-            return
-
-        try:
-            # Stop marquee animation if running
-            self._marquee_stop.set()
-            if self._marquee_thread is not None:
-                self._marquee_thread.join(timeout=0.5)
-                self._marquee_thread = None
-
-            with self._draw_lock:
-                # Clear image buffer
-                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
-
-                # Top line: "Setup Mode" in large font (16px)
-                setup_text = "Setup Mode Wifi"
-                self._draw_text(2, 0, setup_text, font=self.temp_font)
-
-                # Bottom line: "Wifi: Freezerbot-Setup-XXXX" in base font (8px)
-                # Get last 4 digits of serial number
-                serial_suffix = self.serial[-4:] if len(self.serial) >= 4 else self.serial
-                wifi_text = f"Freezerbot-Setup-{serial_suffix}"
-                self._draw_text(2, 18, wifi_text, font=self.base_font)
-
-                # Push to display
-                self.display.image(self.image)
-                self.display.show()
-
-        except Exception:
-            print(f"Error showing setup mode display: {traceback.format_exc()}")
+        # Get last 4 digits of serial number
+        serial_suffix = self.serial[-4:] if len(self.serial) >= 4 else self.serial
+        wifi_text = f"Freezerbot-Setup-{serial_suffix}"
+        self._show_two_line_message("Setup Mode Wifi", wifi_text)
 
     def show_configuring_message(self):
         """Display 'Configuring...' message during setup"""
-        if not self.display_available or self.display is None:
-            return
-
-        try:
-            # Stop marquee animation if running
-            self._marquee_stop.set()
-            if self._marquee_thread is not None:
-                self._marquee_thread.join(timeout=0.5)
-                self._marquee_thread = None
-
-            with self._draw_lock:
-                # Clear image buffer
-                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
-
-                # Top line: "Configuring..." in large font (16px)
-                self._draw_text(2, 8, "Configuring...", font=self.temp_font)
-
-                # Push to display
-                self.display.image(self.image)
-                self.display.show()
-
-        except Exception:
-            print(f"Error showing configuring message: {traceback.format_exc()}")
+        self._show_centered_message("Configuring...")
 
     def show_wifi_found_message(self, network_name: str):
         """Display 'Wifi found' with network name
@@ -281,113 +274,19 @@ class DisplayControl:
         Args:
             network_name: The SSID of the connected network
         """
-        if not self.display_available or self.display is None:
-            return
-
-        try:
-            # Stop marquee animation if running
-            self._marquee_stop.set()
-            if self._marquee_thread is not None:
-                self._marquee_thread.join(timeout=0.5)
-                self._marquee_thread = None
-
-            with self._draw_lock:
-                # Clear image buffer
-                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
-
-                # Top line: "Wifi found" in large font (16px)
-                self._draw_text(2, 0, "Wifi found", font=self.temp_font)
-
-                # Bottom line: network name in base font (8px)
-                self._draw_text(2, 18, network_name, font=self.base_font)
-
-                # Push to display
-                self.display.image(self.image)
-                self.display.show()
-
-        except Exception:
-            print(f"Error showing wifi found message: {traceback.format_exc()}")
+        self._show_two_line_message("Wifi found", network_name)
 
     def show_no_wifi_message(self):
         """Display 'No wifi connection' message"""
-        if not self.display_available or self.display is None:
-            return
-
-        try:
-            # Stop marquee animation if running
-            self._marquee_stop.set()
-            if self._marquee_thread is not None:
-                self._marquee_thread.join(timeout=0.5)
-                self._marquee_thread = None
-
-            with self._draw_lock:
-                # Clear image buffer
-                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
-
-                self._draw_text(0, 0, "No wifi", font=self.temp_font)
-                self._draw_text(0, 18, "connection", font=self.base_font)
-
-                # Push to display
-                self.display.image(self.image)
-                self.display.show()
-
-        except Exception:
-            print(f"Error showing no wifi message: {traceback.format_exc()}")
+        self._show_two_line_message("No wifi", "connection")
 
     def show_configuration_successful_message(self):
         """Display 'Configuration successful' message"""
-        if not self.display_available or self.display is None:
-            return
-
-        try:
-            # Stop marquee animation if running
-            self._marquee_stop.set()
-            if self._marquee_thread is not None:
-                self._marquee_thread.join(timeout=0.5)
-                self._marquee_thread = None
-
-            with self._draw_lock:
-                # Clear image buffer
-                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
-
-                self._draw_text(0, 0, "Configuration", font=self.temp_font)
-                self._draw_text(0, 18, "successful", font=self.base_font)
-
-                # Push to display
-                self.display.image(self.image)
-                self.display.show()
-
-        except Exception:
-            print(f"Error showing configuration successful message: {traceback.format_exc()}")
+        self._show_two_line_message("Configuration", "successful")
 
     def show_invalid_login_message(self):
         """Display 'Invalid login / enter setup mode' message"""
-        if not self.display_available or self.display is None:
-            return
-
-        try:
-            # Stop marquee animation if running
-            self._marquee_stop.set()
-            if self._marquee_thread is not None:
-                self._marquee_thread.join(timeout=0.5)
-                self._marquee_thread = None
-
-            with self._draw_lock:
-                # Clear image buffer
-                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
-
-                # Top line: "Invalid login" in large font (16px)
-                self._draw_text(2, 0, "Invalid login", font=self.temp_font)
-
-                # Bottom line: "enter setup mode" in base font (8px)
-                self._draw_text(2, 18, "enter setup mode", font=self.base_font)
-
-                # Push to display
-                self.display.image(self.image)
-                self.display.show()
-
-        except Exception:
-            print(f"Error showing invalid login message: {traceback.format_exc()}")
+        self._show_two_line_message("Invalid login", "enter setup mode")
 
     def show_api_error_message(self, status_code: int, response_text: str):
         """Display API error with status code and response text in a marquee
@@ -401,10 +300,7 @@ class DisplayControl:
 
         try:
             # Stop any existing marquee animation
-            self._marquee_stop.set()
-            if self._marquee_thread is not None:
-                self._marquee_thread.join(timeout=0.5)
-                self._marquee_thread = None
+            self._stop_marquee()
 
             # Format the error message for the marquee
             error_message = f"API Error {status_code}: {response_text}"
@@ -424,7 +320,7 @@ class DisplayControl:
                 self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
 
                 # Top line: "API Error" in large font (16px)
-                self._draw_text(2, 0, "API Error", font=self.temp_font)
+                self._draw_text(0, 0, "API Error", font=self.temp_font)
 
                 # Bottom line: Start the marquee with status code and response text
                 # The marquee will be drawn by the _marquee_loop thread
@@ -491,7 +387,7 @@ class DisplayControl:
                 # Draw temperature (left side, prominent) at 16px
                 if self.temperature_f is not None:
                     temp_text = f"{self.temperature_f:.1f}F"
-                    self._draw_text(2, 0, temp_text, font=self.temp_font)
+                    self._draw_text(0, 0, temp_text, font=self.temp_font)
 
                 # Always show marquee at the bottom (custom message or default device name)
                 # Prioritize custom marquee_text over default_marquee
