@@ -85,10 +85,26 @@ class DisplayControl:
             self.image = Image.new('1', (self.display.width, self.display.height))
             self.draw = ImageDraw.Draw(self.image)
 
-            # Use default pixel font for clarity on small OLED
+            # Use default 8px font for serial and marquee
             self.base_font = ImageFont.load_default()
-            self.temp_font = self.base_font
             self.small_font = self.base_font
+            
+            # Create 16px font for temperature using truetype
+            try:
+                # Try common system fonts
+                for font_path in ['/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+                                  '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+                                  '/usr/share/fonts/truetype/freefont/FreeSans.ttf']:
+                    try:
+                        self.temp_font = ImageFont.truetype(font_path, 16)
+                        break
+                    except:
+                        continue
+                else:
+                    # Fallback to default if no truetype found
+                    self.temp_font = self.base_font
+            except:
+                self.temp_font = self.base_font
 
             self._clear_display()
             print("Display initialized successfully")
@@ -157,16 +173,16 @@ class DisplayControl:
                 # Draw Wi‑Fi icon
                 self._draw_wifi_icon(wifi_x, wifi_y, self.wifi_connected)
 
-                # Draw temperature (left side, prominent)
+                # Draw temperature (left side, prominent) at 16px
                 if self.temperature_f is not None:
                     temp_text = f"{self.temperature_f:.1f}F"
-                    self._draw_text_scaled(2, 0, temp_text)
+                    self._draw_text(2, 0, temp_text, font=self.temp_font)
 
                 # Draw serial number only when marquee is not active
                 if not self.marquee_text:
                     last4 = self.serial[-4:] if len(self.serial) >= 4 else self.serial
-                    serial_text = f"Sr# {last4}"
-                    self._draw_text_scaled(2, 16, serial_text)
+                    serial_text = f"Sr {last4}"
+                    self._draw_text(2, 16, serial_text)
 
                 # Marquee at the bottom when enabled; hide serial during marquee
                 if self.marquee_text:
@@ -181,7 +197,7 @@ class DisplayControl:
                     x = self.marquee_offset
                     # Draw copies for seamless looping
                     while x < 128:
-                        self._draw_text_scaled(x, y, msg)
+                        self._draw_text(x, y, msg)
                         x += text_w + gap
 
                 # Push to display
@@ -191,10 +207,12 @@ class DisplayControl:
         except Exception:
             print(f"Error refreshing display: {traceback.format_exc()}")
 
-    def _draw_text_scaled(self, x: int, y: int, text: str, scale: int = 1):
-        """Draw text at position (x, y) using default font (scale param ignored for backward compat)"""
+    def _draw_text(self, x: int, y: int, text: str, font=None):
+        """Draw text at position (x, y) using specified font (defaults to base_font)"""
+        if font is None:
+            font = self.base_font or self.small_font
         try:
-            self.draw.text((x, y), text, fill=255, font=self.base_font or self.small_font)
+            self.draw.text((x, y), text, fill=255, font=font)
         except Exception:
             self.draw.text((x, y), text, fill=255)
 
