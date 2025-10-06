@@ -252,6 +252,12 @@ class FirmwareUpdater:
                 log_prefix="Install"
             )
 
+            self.logger.info('Running install-system-deps script')
+            self.run_command_with_logging(
+                ["/usr/bin/sudo", f"{self.base_directory}/install-system-deps.sh"],
+                log_prefix="Install system deps"
+            )
+
             self.run_command_with_logging(
                 ["/usr/bin/sudo", f"{self.base_directory}/.venv/bin/pip", "install", "-r", f"{self.base_directory}/requirements.txt"],
                 log_prefix="PIP install"
