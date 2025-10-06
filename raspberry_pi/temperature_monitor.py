@@ -142,6 +142,10 @@ class TemperatureMonitor:
 
     def _check_for_reboot_condition(self, failure_type):
         """Check if we need to reboot the system based on consecutive error count"""
+        try:
+            self.display_control.show_bad_probe_message()
+        except Exception:
+            pass
         if self.consecutive_sensor_errors >= self.max_sensor_errors_before_reboot and self.reboot_count <= self.max_reboots:
             print(f"Rebooting after {self.consecutive_sensor_errors} sensor failures")
             self.report_and_reboot_system(failure_type)

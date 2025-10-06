@@ -288,6 +288,10 @@ class DisplayControl:
         """Display 'Invalid login / enter setup mode' message"""
         self._show_two_line_message("Invalid login", "enter setup mode")
 
+    def show_bad_probe_message(self):
+        """Display 'Bad probe / Contact Support' message when temperature sensor errors are detected"""
+        self._show_two_line_message("Bad probe", "Contact Support")
+
     def show_api_error_message(self, status_code: int, response_text: str):
         """Display API error with status code and response text in a marquee
         
