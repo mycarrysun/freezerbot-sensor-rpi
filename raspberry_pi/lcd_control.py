@@ -52,6 +52,21 @@ class DisplayControl:
         self.draw = None
         self.temp_font = None
         self.small_font = None
+        self.base_font = None
+        # Scale factors for pixel-doubled text
+        self.temp_scale = 2
+        self.serial_scale = 2
+        self.marquee_scale = 2
+
+        # Synchronization for drawing and animation
+        self._draw_lock = threading.Lock()
+
+        # Marquee state
+        self.marquee_text: Optional[str] = None
+        self.marquee_offset: int = 0
+        self.marquee_speed_px: int = 1  # pixels per frame
+        self._marquee_thread: Optional[threading.Thread] = None
+        self._marquee_stop = threading.Event()
 
         # Display state
         self.temperature_f = None
@@ -74,14 +89,10 @@ class DisplayControl:
             self.image = Image.new('1', (self.display.width, self.display.height))
             self.draw = ImageDraw.Draw(self.image)
 
-            # Try to load fonts
-            try:
-                self.temp_font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 16)
-                self.small_font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 8)
-            except:
-                # Fall back to default font
-                self.temp_font = ImageFont.load_default()
-                self.small_font = ImageFont.load_default()
+            # Use default pixel font for clarity on small OLED
+            self.base_font = ImageFont.load_default()
+            self.temp_font = self.base_font
+            self.small_font = self.base_font
 
             self._clear_display()
             print("Display initialized successfully")
@@ -133,67 +144,190 @@ class DisplayControl:
             return
 
         try:
-            # Clear image buffer
-            self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
+            with self._draw_lock:
+                # Clear image buffer
+                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
 
-            # Draw temperature (left side, prominent)
-            if self.temperature_f is not None:
-                temp_text = f"{self.temperature_f:.1f}F"
-                self.draw.text((2, 4), temp_text, fill=255, font=self.temp_font)
+                # Top-right: battery and Wi‑Fi side-by-side
+                battery_x = 128 - 22 - 1  # battery body(20 incl. terminal) + 1px margin
+                battery_y = 0
+                wifi_x = battery_x - 12  # leave ~2px gap within icon function
+                wifi_y = 0
 
-            # Draw battery status (top right)
-            if self.battery_percent is not None:
-                self._draw_battery_icon(98, 2, self.battery_percent, self.is_charging, self.is_plugged_in)
-                battery_text = f"{int(self.battery_percent)}%"
-                self.draw.text((98, 12), battery_text, fill=255, font=self.small_font)
+                # Draw battery icon only (no percent text or + symbol)
+                if self.battery_percent is not None:
+                    self._draw_battery_icon(battery_x, battery_y, self.battery_percent, self.is_charging, self.is_plugged_in)
 
-            # Draw WiFi status (middle right)
-            self._draw_wifi_icon(106, 22, self.wifi_connected)
+                # Draw Wi‑Fi icon
+                self._draw_wifi_icon(wifi_x, wifi_y, self.wifi_connected)
 
-            # Draw serial number (bottom left)
-            serial_display = self.serial[-8:] if len(self.serial) > 8 else self.serial
-            serial_text = f"{serial_display}"
-            self.draw.text((2, 24), serial_text, fill=255, font=self.small_font)
+                # Draw temperature (left side, prominent) using pixel-scaled default font
+                if self.temperature_f is not None:
+                    temp_text = f"{self.temperature_f:.1f}F"
+                    self._draw_text_scaled(2, 0, temp_text, self.temp_scale)
 
-            # Push to display
-            self.display.image(self.image)
-            self.display.show()
+                # Draw serial number larger only when marquee is not active
+                if not self.marquee_text:
+                    last4 = self.serial[-4:] if len(self.serial) >= 4 else self.serial
+                    serial_text = f"Sr# {last4}"
+                    self._draw_text_scaled(2, 16, serial_text, self.serial_scale)
+
+                # Marquee at the bottom when enabled (larger text); hide serial during marquee
+                if self.marquee_text:
+                    msg = self.marquee_text
+                    # Measure scaled width
+                    try:
+                        base_w = int(self.draw.textlength(msg, font=self.base_font))
+                    except Exception:
+                        base_w = self.base_font.getsize(msg)[0] if hasattr(self.base_font, 'getsize') else len(msg) * 6
+                    text_w = base_w * self.marquee_scale
+                    y = 16  # bottom half of the 32px display
+                    x1 = self.marquee_offset
+                    # draw copies for seamless looping
+                    self._draw_text_scaled(x1, y, msg, self.marquee_scale)
+                    gap = 16  # base pixels between repeats
+                    gap_scaled = gap * self.marquee_scale
+                    x2 = x1 + text_w + gap_scaled
+                    # Draw enough copies to cover the width
+                    while x2 < 128:
+                        self._draw_text_scaled(x2, y, msg, self.marquee_scale)
+                        x2 += text_w + gap_scaled
+
+                # Push to display
+                self.display.image(self.image)
+                self.display.show()
 
         except Exception:
             print(f"Error refreshing display: {traceback.format_exc()}")
 
+    def _draw_text_scaled(self, x: int, y: int, text: str, scale: int = 1):
+        if scale <= 1:
+            try:
+                self.draw.text((x, y), text, fill=255, font=self.base_font or self.small_font)
+            except Exception:
+                self.draw.text((x, y), text, fill=255)
+            return
+        try:
+            # Measure width with base font
+            try:
+                w = int(self.draw.textlength(text, font=self.base_font or self.small_font))
+            except Exception:
+                fnt = self.base_font or self.small_font
+                w = fnt.getsize(text)[0] if hasattr(fnt, 'getsize') else len(text) * 6
+            # Measure height
+            fnt = self.base_font or self.small_font
+            try:
+                bbox = fnt.getbbox(text)
+                h = bbox[3] - bbox[1]
+                if h <= 0:
+                    h = 8
+            except Exception:
+                try:
+                    h = fnt.getsize(text)[1]
+                except Exception:
+                    h = 8
+            tmp = Image.new('1', (max(1, w), max(1, h)), 0)
+            d = ImageDraw.Draw(tmp)
+            d.text((0, 0), text, fill=255, font=fnt)
+            scaled = tmp.resize((max(1, w * scale), max(1, h * scale)), resample=Image.NEAREST)
+            self.image.paste(scaled, (x, y))
+        except Exception:
+            # Fallback to regular draw
+            self.draw.text((x, y), text, fill=255, font=self.base_font or self.small_font)
+
     def _draw_battery_icon(self, x: int, y: int, percent: float, charging: bool, plugged_in: bool):
-        """Draw battery icon with charge level"""
+        """Draw battery icon with charge level (no percent text or + sign)."""
         # Battery body (18x8 pixels)
         self.draw.rectangle((x, y, x + 18, y + 7), outline=255, fill=0)
         # Battery terminal
         self.draw.rectangle((x + 18, y + 2, x + 20, y + 5), outline=255, fill=255)
 
-        # Fill level
-        if percent > 0:
-            fill_width = int((percent / 100) * 16)
-            self.draw.rectangle((x + 1, y + 1, x + 1 + fill_width, y + 6), outline=255, fill=255)
-
-        # Charging indicator
-        if charging or plugged_in:
-            self.draw.text((x + 22, y - 2), '+', fill=255)
+        # Fill level (>=95% fills completely)
+        if percent is not None and percent > 0:
+            fill_width = 16 if percent >= 95 else int((max(0, min(100, percent)) / 100) * 16)
+            if fill_width > 0:
+                self.draw.rectangle((x + 1, y + 1, x + 1 + fill_width, y + 6), outline=255, fill=255)
 
     def _draw_wifi_icon(self, x: int, y: int, connected: bool):
-        """Draw WiFi status icon"""
-        if connected:
-            # WiFi signal bars (simplified)
-            self.draw.rectangle((x + 3, y + 6, x + 4, y + 7), fill=255)
-            self.draw.rectangle((x + 1, y + 4, x + 2, y + 7), fill=255)
-            self.draw.rectangle((x + 5, y + 4, x + 6, y + 7), fill=255)
-            self.draw.rectangle((x, y + 2, x + 1, y + 7), fill=255)
-            self.draw.rectangle((x + 7, y + 2, x + 8, y + 7), fill=255)
+        """Draw Wi‑Fi status as ascending RSSI bars; X overlay when disconnected."""
+        # Icon size ~12x10 (fits next to battery)
+        base_y = y + 9  # bottom baseline
+        bar_w = 2
+        spacing = 1
+        heights = [3, 5, 7, 9]
+        # Clear area first (optional if background already cleared)
+        # Draw bars
+        for i, h in enumerate(heights):
+            left = x + i * (bar_w + spacing)
+            if connected:
+                self.draw.rectangle((left, base_y - h, left + bar_w - 1, base_y), fill=255)
+            else:
+                # outline when disconnected for subtle look
+                self.draw.rectangle((left, base_y - h, left + bar_w - 1, base_y), outline=255, fill=0)
+        if not connected:
+            # X overlay
+            self.draw.line((x, y, x + 11, y + 9), fill=255)
+            self.draw.line((x + 11, y, x, y + 9), fill=255)
+
+    def set_marquee(self, text: Optional[str], speed_px: int = 1):
+        """Set a scrolling marquee message at the bottom. Pass None or '' to disable."""
+        if not self.display_available:
+            return
+        if text:
+            self.marquee_text = text
+            self.marquee_speed_px = max(1, int(speed_px))
+            self.marquee_offset = 128  # start from the right edge
+            if self._marquee_thread is None or not self._marquee_thread.is_alive():
+                self._marquee_stop.clear()
+                self._marquee_thread = threading.Thread(target=self._marquee_loop, daemon=True)
+                self._marquee_thread.start()
         else:
-            # X symbol for disconnected
-            self.draw.line((x, y, x + 8, y + 8), fill=255)
-            self.draw.line((x + 8, y, x, y + 8), fill=255)
+            self.clear_marquee()
+
+    def clear_marquee(self):
+        """Disable the marquee message and stop the animation thread."""
+        self.marquee_text = None
+        self._marquee_stop.set()
+        if self._marquee_thread is not None:
+            self._marquee_thread.join(timeout=0.5)
+            self._marquee_thread = None
+
+    def _marquee_loop(self):
+        """Background loop to scroll the marquee while enabled."""
+        try:
+            import time
+            while not self._marquee_stop.is_set():
+                if not self.marquee_text:
+                    # Nothing to show; pause and continue
+                    time.sleep(0.2)
+                    continue
+                # Measure text width (scaled)
+                try:
+                    base_w = int(self.draw.textlength(self.marquee_text, font=self.base_font or self.small_font))
+                except Exception:
+                    fnt = self.base_font or self.small_font
+                    base_w = fnt.getsize(self.marquee_text)[0] if hasattr(fnt, 'getsize') else len(self.marquee_text) * 6
+                text_w = base_w * self.marquee_scale
+                gap_scaled = 16 * self.marquee_scale
+
+                # Update position
+                self.marquee_offset -= self.marquee_speed_px
+                if self.marquee_offset < -(text_w + gap_scaled):
+                    self.marquee_offset = 128
+
+                # Refresh display
+                self._refresh_display()
+                time.sleep(0.1)
+        except Exception:
+            # Fail quietly to avoid affecting main process
+            pass
 
     def cleanup(self):
         """Clean up display resources"""
+        try:
+            self.clear_marquee()
+        except Exception:
+            pass
         if self.display_available and self.display is not None:
             try:
                 self._clear_display()

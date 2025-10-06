@@ -252,6 +252,8 @@ class FreezerBotSetup:
             serial = "0000"
 
         hotspot_name = f"Freezerbot-Setup-{serial}"
+        # Save for display messaging
+        self.hotspot_name = hotspot_name
 
         # Tell NetworkManager to release the wlan0 interface temporarily
         subprocess.run(["/usr/bin/nmcli", "device", "set", "wlan0", "managed", "no"])
@@ -337,6 +339,9 @@ address=/#/192.168.4.1
                         self.pisugar.is_charging(),
                         self.pisugar.is_power_plugged(),
                     )
+                    # Show instruction marquee at the bottom
+                    if hasattr(self, 'hotspot_name') and self.hotspot_name:
+                        self.display_control.set_marquee(f"Connect to WiFi {self.hotspot_name}")
                 except Exception:
                     pass
 
