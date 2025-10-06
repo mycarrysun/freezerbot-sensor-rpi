@@ -223,6 +223,209 @@ class DisplayControl:
         except Exception:
             print(f"Error showing setup mode display: {traceback.format_exc()}")
 
+    def show_configuring_message(self):
+        """Display 'Configuring...' message during setup"""
+        if not self.display_available or self.display is None:
+            return
+
+        try:
+            # Stop marquee animation if running
+            self._marquee_stop.set()
+            if self._marquee_thread is not None:
+                self._marquee_thread.join(timeout=0.5)
+                self._marquee_thread = None
+
+            with self._draw_lock:
+                # Clear image buffer
+                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
+
+                # Top line: "Configuring..." in large font (16px)
+                self._draw_text(2, 8, "Configuring...", font=self.temp_font)
+
+                # Push to display
+                self.display.image(self.image)
+                self.display.show()
+
+        except Exception:
+            print(f"Error showing configuring message: {traceback.format_exc()}")
+
+    def show_wifi_found_message(self, network_name: str):
+        """Display 'Wifi found' with network name
+        
+        Args:
+            network_name: The SSID of the connected network
+        """
+        if not self.display_available or self.display is None:
+            return
+
+        try:
+            # Stop marquee animation if running
+            self._marquee_stop.set()
+            if self._marquee_thread is not None:
+                self._marquee_thread.join(timeout=0.5)
+                self._marquee_thread = None
+
+            with self._draw_lock:
+                # Clear image buffer
+                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
+
+                # Top line: "Wifi found" in large font (16px)
+                self._draw_text(2, 0, "Wifi found", font=self.temp_font)
+
+                # Bottom line: network name in base font (8px)
+                self._draw_text(2, 18, network_name, font=self.base_font)
+
+                # Push to display
+                self.display.image(self.image)
+                self.display.show()
+
+        except Exception:
+            print(f"Error showing wifi found message: {traceback.format_exc()}")
+
+    def show_no_wifi_message(self):
+        """Display 'No wifi connection' message"""
+        if not self.display_available or self.display is None:
+            return
+
+        try:
+            # Stop marquee animation if running
+            self._marquee_stop.set()
+            if self._marquee_thread is not None:
+                self._marquee_thread.join(timeout=0.5)
+                self._marquee_thread = None
+
+            with self._draw_lock:
+                # Clear image buffer
+                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
+
+                # Center text vertically: "No wifi connection" in large font (16px)
+                self._draw_text(2, 8, "No wifi", font=self.temp_font)
+                self._draw_text(2, 24, "connection", font=self.base_font)
+
+                # Push to display
+                self.display.image(self.image)
+                self.display.show()
+
+        except Exception:
+            print(f"Error showing no wifi message: {traceback.format_exc()}")
+
+    def show_configuration_successful_message(self):
+        """Display 'Configuration successful' message"""
+        if not self.display_available or self.display is None:
+            return
+
+        try:
+            # Stop marquee animation if running
+            self._marquee_stop.set()
+            if self._marquee_thread is not None:
+                self._marquee_thread.join(timeout=0.5)
+                self._marquee_thread = None
+
+            with self._draw_lock:
+                # Clear image buffer
+                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
+
+                # Top line: "Configuration" in large font (16px)
+                self._draw_text(2, 0, "Configuration", font=self.temp_font)
+
+                # Bottom line: "successful" in large font (16px)
+                self._draw_text(2, 18, "successful", font=self.temp_font)
+
+                # Push to display
+                self.display.image(self.image)
+                self.display.show()
+
+        except Exception:
+            print(f"Error showing configuration successful message: {traceback.format_exc()}")
+
+    def show_invalid_login_message(self):
+        """Display 'Invalid login / enter setup mode' message"""
+        if not self.display_available or self.display is None:
+            return
+
+        try:
+            # Stop marquee animation if running
+            self._marquee_stop.set()
+            if self._marquee_thread is not None:
+                self._marquee_thread.join(timeout=0.5)
+                self._marquee_thread = None
+
+            with self._draw_lock:
+                # Clear image buffer
+                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
+
+                # Top line: "Invalid login" in large font (16px)
+                self._draw_text(2, 0, "Invalid login", font=self.temp_font)
+
+                # Bottom line: "enter setup mode" in base font (8px)
+                self._draw_text(2, 18, "enter setup mode", font=self.base_font)
+
+                # Push to display
+                self.display.image(self.image)
+                self.display.show()
+
+        except Exception:
+            print(f"Error showing invalid login message: {traceback.format_exc()}")
+
+    def show_api_error_message(self, status_code: int, response_text: str):
+        """Display API error with status code and response text in a marquee
+        
+        Args:
+            status_code: HTTP status code from the API response
+            response_text: Response text from the API
+        """
+        if not self.display_available or self.display is None:
+            return
+
+        try:
+            # Stop any existing marquee animation
+            self._marquee_stop.set()
+            if self._marquee_thread is not None:
+                self._marquee_thread.join(timeout=0.5)
+                self._marquee_thread = None
+
+            # Format the error message for the marquee
+            error_message = f"API Error {status_code}: {response_text}"
+            
+            # Set this as the marquee text
+            self.marquee_text = error_message
+            self.marquee_offset = 0
+            
+            # Start the marquee thread if not already running
+            if self._marquee_thread is None or not self._marquee_thread.is_alive():
+                self._marquee_stop.clear()
+                self._marquee_thread = threading.Thread(target=self._marquee_loop, daemon=True)
+                self._marquee_thread.start()
+
+            with self._draw_lock:
+                # Clear image buffer
+                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
+
+                # Top line: "API Error" in large font (16px)
+                self._draw_text(2, 0, "API Error", font=self.temp_font)
+
+                # Bottom line: Start the marquee with status code and response text
+                # The marquee will be drawn by the _marquee_loop thread
+                msg = error_message
+                try:
+                    text_w = int(self.draw.textlength(msg, font=self.base_font))
+                except Exception:
+                    text_w = self.base_font.getsize(msg)[0] if hasattr(self.base_font, 'getsize') else len(msg) * 6
+                gap = 8
+                y = 16
+                x = self.marquee_offset
+                # Draw initial copies for seamless looping
+                while x < 128:
+                    self._draw_text(x, y, msg)
+                    x += text_w + gap
+
+                # Push to display
+                self.display.image(self.image)
+                self.display.show()
+
+        except Exception:
+            print(f"Error showing API error message: {traceback.format_exc()}")
+
     def _refresh_display(self):
         """Redraw the entire display with current state"""
         if not self.display_available or self.display is None:

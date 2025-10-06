@@ -122,6 +122,12 @@ class FreezerBotSetup:
                 "device_name": device_name
             }
 
+            # Show "Configuring..." message immediately
+            try:
+                self.display_control.show_configuring_message()
+            except Exception:
+                pass
+
             self.config.save_new_config(config)
 
             self.setup_network_manager(networks)
@@ -138,16 +144,157 @@ class FreezerBotSetup:
             return jsonify({"success": False, "error": str(e)})
 
     def delayed_restart(self):
-        """Restart in sensor mode after a delay to allow frontend to show countdown"""
+        """Configure device: check WiFi, validate API credentials, then restart in sensor mode.
+        
+        Note: Must ALWAYS exit setup mode and restart in sensor mode, regardless of success or failure.
+        This is because the hotspot must be shut down for WiFi to work - staying in setup mode with
+        an active hotspot prevents the WiFi antenna from connecting to networks or making API calls.
+        """
         try:
-            # Wait for the countdown to complete (10 seconds)
+            from network import connected_to_wifi
+            from api import make_api_request_with_creds
+            from device_info import DeviceInfo
+            from datetime import datetime
+            
+            # Wait for network manager to set up connections
+            # Frontend shows countdown for 10 seconds
             time.sleep(10)
-
-            # Then restart in sensor mode
-            restart_in_sensor_mode()
+            
+            # CRITICAL: Stop the hotspot and re-enable WiFi interface BEFORE attempting connection
+            # The hotspot must be deactivated for the WiFi antenna to connect to networks
+            print("Stopping hotspot services to enable WiFi connection...")
+            subprocess.run(["/usr/bin/systemctl", "stop", "hostapd.service"])
+            subprocess.run(["/usr/bin/systemctl", "stop", "dnsmasq.service"])
+            
+            # Re-enable NetworkManager control of wlan0
+            subprocess.run(["/usr/bin/nmcli", "device", "set", "wlan0", "managed", "yes"])
+            subprocess.run(["/usr/bin/systemctl", "restart", "NetworkManager.service"])
+            
+            # Wait for NetworkManager to initialize and attempt WiFi connection
+            print("Waiting for NetworkManager to initialize and connect to WiFi...")
+            time.sleep(5)
+            
+            # Give additional time for WiFi to connect
+            max_wifi_wait = 20  # seconds
+            wifi_connected = False
+            connected_network_name = None
+            
+            for i in range(max_wifi_wait):
+                if connected_to_wifi():
+                    wifi_connected = True
+                    # Try to get the connected network name
+                    try:
+                        result = subprocess.run(
+                            ["/usr/bin/nmcli", "-t", "-f", "NAME,DEVICE", "connection", "show", "--active"],
+                            capture_output=True, text=True, timeout=2
+                        )
+                        for line in result.stdout.strip().split('\n'):
+                            if 'wlan0' in line:
+                                connected_network_name = line.split(':')[0]
+                                break
+                    except Exception:
+                        pass
+                    break
+                time.sleep(1)
+            
+            if not wifi_connected:
+                # Show "No wifi connection" message
+                try:
+                    self.display_control.show_no_wifi_message()
+                except Exception:
+                    pass
+                print("WiFi connection failed during setup")
+                self.led_control.set_state('error')
+                # Wait to show the message, then restart in sensor mode
+                time.sleep(5)
+            else:
+                # WiFi connected - show success message
+                try:
+                    if connected_network_name:
+                        self.display_control.show_wifi_found_message(connected_network_name)
+                    else:
+                        self.display_control.show_wifi_found_message("Connected")
+                except Exception:
+                    pass
+                
+                # Wait a moment to show the wifi success message
+                time.sleep(2)
+                
+                # Now validate credentials with API
+                try:
+                    device_info = DeviceInfo()
+                    response = make_api_request_with_creds(
+                        {
+                            'email': self.config.config['email'],
+                            'password': self.config.config['password'],
+                        },
+                        'sensors/configure',
+                        json={**device_info.device_info, **{
+                            'name': self.config.config['device_name'],
+                            'configured_at': datetime.utcnow().isoformat() + 'Z'
+                        }}
+                    )
+                    
+                    if response.status_code == 401:
+                        # Invalid credentials
+                        print('Invalid Freezerbot login credentials')
+                        try:
+                            self.display_control.show_invalid_login_message()
+                        except Exception:
+                            pass
+                        self.led_control.set_state('error')
+                        # Wait to show the message, then restart in sensor mode
+                        time.sleep(5)
+                    elif response.status_code != 201:
+                        # Other API error
+                        print(f'Error configuring with API: {response.status_code} {response.text}')
+                        try:
+                            self.display_control.show_api_error_message(response.status_code, response.text)
+                        except Exception:
+                            pass
+                        self.led_control.set_state('error')
+                        # Wait to show the message, then restart in sensor mode
+                        time.sleep(5)
+                    else:
+                        # Success!
+                        print('Configuration successful')
+                        try:
+                            self.display_control.show_configuration_successful_message()
+                        except Exception:
+                            pass
+                        
+                        # Wait a moment to show success message
+                        time.sleep(3)
+                        
+                except Exception as e:
+                    print(f"Error during API configuration: {traceback.format_exc()}")
+                    try:
+                        # Show API error with status 0 (connection error) and exception message
+                        self.display_control.show_api_error_message(0, str(e))
+                    except Exception:
+                        pass
+                    self.led_control.set_state('error')
+                    # Wait to show the message, then restart in sensor mode
+                    time.sleep(5)
+            
+            # Switch to sensor mode by restarting services
+            # (hotspot already stopped and WiFi already re-enabled above)
+            print("Switching to sensor mode...")
+            subprocess.run(["/usr/bin/systemctl", "enable", "freezerbot-monitor.service"])
+            subprocess.run(["/usr/bin/systemctl", "restart", "freezerbot-monitor.service"])
+            subprocess.run(["/usr/bin/systemctl", "disable", "freezerbot-setup.service"])
+            subprocess.run(["/usr/bin/systemctl", "stop", "freezerbot-setup.service"])
+                
         except Exception as e:
             print(f"Error during delayed restart: {traceback.format_exc()}")
             self.led_control.set_state('error')
+            # Even on catastrophic failure, try to restart in sensor mode
+            try:
+                time.sleep(3)
+                # On failure, use full restart_in_sensor_mode in case hotspot wasn't stopped
+                restart_in_sensor_mode()
+            except Exception:
+                print(f"Failed to restart in sensor mode: {traceback.format_exc()}")
 
     def captive_portal_redirect(self):
         """Redirect captive portal detection requests to the setup page"""
