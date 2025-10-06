@@ -190,6 +190,39 @@ class DisplayControl:
             self._marquee_thread.start()
         self._refresh_display()
 
+    def show_setup_mode(self):
+        """Display setup mode screen with WiFi hotspot information"""
+        if not self.display_available or self.display is None:
+            return
+
+        try:
+            # Stop marquee animation if running
+            self._marquee_stop.set()
+            if self._marquee_thread is not None:
+                self._marquee_thread.join(timeout=0.5)
+                self._marquee_thread = None
+
+            with self._draw_lock:
+                # Clear image buffer
+                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
+
+                # Top line: "Setup Mode" in large font (16px)
+                setup_text = "Setup Mode"
+                self._draw_text(2, 0, setup_text, font=self.temp_font)
+
+                # Bottom line: "Wifi: Freezerbot-Setup-XXXX" in base font (8px)
+                # Get last 4 digits of serial number
+                serial_suffix = self.serial[-4:] if len(self.serial) >= 4 else self.serial
+                wifi_text = f"Wifi: Freezerbot-Setup-{serial_suffix}"
+                self._draw_text(2, 18, wifi_text, font=self.base_font)
+
+                # Push to display
+                self.display.image(self.image)
+                self.display.show()
+
+        except Exception:
+            print(f"Error showing setup mode display: {traceback.format_exc()}")
+
     def _refresh_display(self):
         """Redraw the entire display with current state"""
         if not self.display_available or self.display is None:

@@ -339,17 +339,9 @@ address=/#/192.168.4.1
 
                 self.led_control.set_state("setup")
 
-                # Update OLED to reflect setup mode (WiFi AP/disconnected) and current battery
+                # Update OLED to show setup mode screen with WiFi hotspot name
                 try:
-                    self.display_control.update_wifi(False)
-                    self.display_control.update_battery(
-                        self.pisugar.get_battery_level(),
-                        self.pisugar.is_charging(),
-                        self.pisugar.is_power_plugged(),
-                    )
-                    # Show instruction marquee at the bottom
-                    if hasattr(self, 'hotspot_name') and self.hotspot_name:
-                        self.display_control.set_marquee(f"Connect to WiFi {self.hotspot_name}")
+                    self.display_control.show_setup_mode()
                 except Exception:
                     pass
 
