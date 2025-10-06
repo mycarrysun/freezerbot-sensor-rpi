@@ -53,10 +53,6 @@ class DisplayControl:
         self.temp_font = None
         self.small_font = None
         self.base_font = None
-        # Scale factors for pixel-doubled text
-        self.temp_scale = 2
-        self.serial_scale = 2
-        self.marquee_scale = 2
 
         # Synchronization for drawing and animation
         self._draw_lock = threading.Lock()
@@ -161,37 +157,32 @@ class DisplayControl:
                 # Draw Wi‑Fi icon
                 self._draw_wifi_icon(wifi_x, wifi_y, self.wifi_connected)
 
-                # Draw temperature (left side, prominent) using pixel-scaled default font
+                # Draw temperature (left side, prominent)
                 if self.temperature_f is not None:
                     temp_text = f"{self.temperature_f:.1f}F"
-                    self._draw_text_scaled(2, 0, temp_text, self.temp_scale)
+                    self._draw_text_scaled(2, 0, temp_text)
 
-                # Draw serial number larger only when marquee is not active
+                # Draw serial number only when marquee is not active
                 if not self.marquee_text:
                     last4 = self.serial[-4:] if len(self.serial) >= 4 else self.serial
                     serial_text = f"Sr# {last4}"
-                    self._draw_text_scaled(2, 16, serial_text, self.serial_scale)
+                    self._draw_text_scaled(2, 16, serial_text)
 
-                # Marquee at the bottom when enabled (larger text); hide serial during marquee
+                # Marquee at the bottom when enabled; hide serial during marquee
                 if self.marquee_text:
                     msg = self.marquee_text
-                    # Measure scaled width
+                    # Measure text width
                     try:
-                        base_w = int(self.draw.textlength(msg, font=self.base_font))
+                        text_w = int(self.draw.textlength(msg, font=self.base_font))
                     except Exception:
-                        base_w = self.base_font.getsize(msg)[0] if hasattr(self.base_font, 'getsize') else len(msg) * 6
-                    text_w = base_w * self.marquee_scale
+                        text_w = self.base_font.getsize(msg)[0] if hasattr(self.base_font, 'getsize') else len(msg) * 6
+                    gap = 16  # pixels between repeats
                     y = 16  # bottom half of the 32px display
-                    x1 = self.marquee_offset
-                    # draw copies for seamless looping
-                    self._draw_text_scaled(x1, y, msg, self.marquee_scale)
-                    gap = 16  # base pixels between repeats
-                    gap_scaled = gap * self.marquee_scale
-                    x2 = x1 + text_w + gap_scaled
-                    # Draw enough copies to cover the width
-                    while x2 < 128:
-                        self._draw_text_scaled(x2, y, msg, self.marquee_scale)
-                        x2 += text_w + gap_scaled
+                    x = self.marquee_offset
+                    # Draw copies for seamless looping
+                    while x < 128:
+                        self._draw_text_scaled(x, y, msg)
+                        x += text_w + gap
 
                 # Push to display
                 self.display.image(self.image)
@@ -201,39 +192,11 @@ class DisplayControl:
             print(f"Error refreshing display: {traceback.format_exc()}")
 
     def _draw_text_scaled(self, x: int, y: int, text: str, scale: int = 1):
-        if scale <= 1:
-            try:
-                self.draw.text((x, y), text, fill=255, font=self.base_font or self.small_font)
-            except Exception:
-                self.draw.text((x, y), text, fill=255)
-            return
+        """Draw text at position (x, y) using default font (scale param ignored for backward compat)"""
         try:
-            # Measure width with base font
-            try:
-                w = int(self.draw.textlength(text, font=self.base_font or self.small_font))
-            except Exception:
-                fnt = self.base_font or self.small_font
-                w = fnt.getsize(text)[0] if hasattr(fnt, 'getsize') else len(text) * 6
-            # Measure height
-            fnt = self.base_font or self.small_font
-            try:
-                bbox = fnt.getbbox(text)
-                h = bbox[3] - bbox[1]
-                if h <= 0:
-                    h = 8
-            except Exception:
-                try:
-                    h = fnt.getsize(text)[1]
-                except Exception:
-                    h = 8
-            tmp = Image.new('1', (max(1, w), max(1, h)), 0)
-            d = ImageDraw.Draw(tmp)
-            d.text((0, 0), text, fill=255, font=fnt)
-            scaled = tmp.resize((max(1, w * scale), max(1, h * scale)), resample=Image.NEAREST)
-            self.image.paste(scaled, (x, y))
-        except Exception:
-            # Fallback to regular draw
             self.draw.text((x, y), text, fill=255, font=self.base_font or self.small_font)
+        except Exception:
+            self.draw.text((x, y), text, fill=255)
 
     def _draw_battery_icon(self, x: int, y: int, percent: float, charging: bool, plugged_in: bool):
         """Draw battery icon with charge level (no percent text or + sign)."""
@@ -301,18 +264,17 @@ class DisplayControl:
                     # Nothing to show; pause and continue
                     time.sleep(0.2)
                     continue
-                # Measure text width (scaled)
+                # Measure text width
                 try:
-                    base_w = int(self.draw.textlength(self.marquee_text, font=self.base_font or self.small_font))
+                    text_w = int(self.draw.textlength(self.marquee_text, font=self.base_font or self.small_font))
                 except Exception:
                     fnt = self.base_font or self.small_font
-                    base_w = fnt.getsize(self.marquee_text)[0] if hasattr(fnt, 'getsize') else len(self.marquee_text) * 6
-                text_w = base_w * self.marquee_scale
-                gap_scaled = 16 * self.marquee_scale
+                    text_w = fnt.getsize(self.marquee_text)[0] if hasattr(fnt, 'getsize') else len(self.marquee_text) * 6
+                gap = 16  # pixels between repeats
 
                 # Update position
                 self.marquee_offset -= self.marquee_speed_px
-                if self.marquee_offset < -(text_w + gap_scaled):
+                if self.marquee_offset < -(text_w + gap):
                     self.marquee_offset = 128
 
                 # Refresh display
