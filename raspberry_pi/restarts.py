@@ -4,6 +4,14 @@ import time
 
 def restart_in_setup_mode():
     """Restart in setup mode - only used when button is explicitly held"""
+    # Display "Entering setup" message on OLED
+    try:
+        from lcd_control import DisplayControl
+        display = DisplayControl()
+        display.show_entering_setup_message()
+    except Exception:
+        pass  # Display is optional, don't fail if unavailable
+    
     time.sleep(2)
     subprocess.run(["/usr/bin/systemctl", "enable", "freezerbot-setup.service"])
     subprocess.run(["/usr/bin/systemctl", "restart", "freezerbot-setup.service"])

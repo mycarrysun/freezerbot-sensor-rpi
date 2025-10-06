@@ -54,10 +54,18 @@ class TemperatureMonitor:
         """Check for a valid config file"""
         if not self.config.configuration_exists:
             print("Configuration file not found. Will restart in setup mode.")
+            try:
+                self.display_control.show_entering_setup_message()
+            except Exception:
+                pass
             restart_in_setup_mode()
             exit(0)
         if not self.config.is_configured:
             print("Configuration file is invalid. Restarting in setup mode.")
+            try:
+                self.display_control.show_entering_setup_message()
+            except Exception:
+                pass
             restart_in_setup_mode()
             exit(0)
 
@@ -79,6 +87,10 @@ class TemperatureMonitor:
                 print('Deleting email and password and restarting in setup mode')
                 self.config.add_config_error('Email or password is incorrect. Please provide the email and password you use to login to the Freezerbot app.')
                 self.config.clear_creds_from_config()
+                try:
+                    self.display_control.show_entering_setup_message()
+                except Exception:
+                    pass
                 restart_in_setup_mode()
             elif response.status_code != 201:
                 print(f'Error obtaining token: {response.status_code} {response.text}')

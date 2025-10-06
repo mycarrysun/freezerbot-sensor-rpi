@@ -190,6 +190,32 @@ class DisplayControl:
             self._marquee_thread.start()
         self._refresh_display()
 
+    def show_entering_setup_message(self):
+        """Display 'Entering setup' message when transitioning to setup mode"""
+        if not self.display_available or self.display is None:
+            return
+
+        try:
+            # Stop marquee animation if running
+            self._marquee_stop.set()
+            if self._marquee_thread is not None:
+                self._marquee_thread.join(timeout=0.5)
+                self._marquee_thread = None
+
+            with self._draw_lock:
+                # Clear image buffer
+                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
+
+                # Center text vertically: "Entering setup" in large font (16px)
+                self._draw_text(2, 8, "Entering setup", font=self.temp_font)
+
+                # Push to display
+                self.display.image(self.image)
+                self.display.show()
+
+        except Exception:
+            print(f"Error showing entering setup message: {traceback.format_exc()}")
+
     def show_setup_mode(self):
         """Display setup mode screen with WiFi hotspot information"""
         if not self.display_available or self.display is None:
