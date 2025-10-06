@@ -205,8 +205,7 @@ class FreezerBotSetup:
                     pass
                 print("WiFi connection failed during setup")
                 self.led_control.set_state('error')
-                # Wait to show the message, then restart in sensor mode
-                time.sleep(5)
+                time.sleep(1)
             else:
                 # WiFi connected - show success message
                 try:
@@ -218,7 +217,7 @@ class FreezerBotSetup:
                     pass
                 
                 # Wait a moment to show the wifi success message
-                time.sleep(2)
+                time.sleep(1)
                 
                 # Now validate credentials with API
                 try:
@@ -236,7 +235,6 @@ class FreezerBotSetup:
                     )
                     
                     if response.status_code == 401:
-                        # Invalid credentials
                         print('Invalid Freezerbot login credentials')
                         try:
                             self.display_control.show_invalid_login_message()
@@ -244,7 +242,7 @@ class FreezerBotSetup:
                             pass
                         self.led_control.set_state('error')
                         # Wait to show the message, then restart in sensor mode
-                        time.sleep(5)
+                        time.sleep(1)
                     elif response.status_code != 201:
                         # Other API error
                         print(f'Error configuring with API: {response.status_code} {response.text}')
@@ -254,7 +252,7 @@ class FreezerBotSetup:
                             pass
                         self.led_control.set_state('error')
                         # Wait to show the message, then restart in sensor mode
-                        time.sleep(5)
+                        time.sleep(1)
                     else:
                         # Success!
                         print('Configuration successful')
@@ -264,7 +262,7 @@ class FreezerBotSetup:
                             pass
                         
                         # Wait a moment to show success message
-                        time.sleep(3)
+                        time.sleep(1)
                         
                 except Exception as e:
                     print(f"Error during API configuration: {traceback.format_exc()}")
@@ -276,9 +274,7 @@ class FreezerBotSetup:
                     self.led_control.set_state('error')
                     # Wait to show the message, then restart in sensor mode
                     time.sleep(5)
-            
-            # Switch to sensor mode by restarting services
-            # (hotspot already stopped and WiFi already re-enabled above)
+
             print("Switching to sensor mode...")
             subprocess.run(["/usr/bin/systemctl", "enable", "freezerbot-monitor.service"])
             subprocess.run(["/usr/bin/systemctl", "restart", "freezerbot-monitor.service"])
@@ -288,13 +284,6 @@ class FreezerBotSetup:
         except Exception as e:
             print(f"Error during delayed restart: {traceback.format_exc()}")
             self.led_control.set_state('error')
-            # Even on catastrophic failure, try to restart in sensor mode
-            try:
-                time.sleep(3)
-                # On failure, use full restart_in_sensor_mode in case hotspot wasn't stopped
-                restart_in_sensor_mode()
-            except Exception:
-                print(f"Failed to restart in sensor mode: {traceback.format_exc()}")
 
     def captive_portal_redirect(self):
         """Redirect captive portal detection requests to the setup page"""

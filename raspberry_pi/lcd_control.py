@@ -324,9 +324,8 @@ class DisplayControl:
                 # Clear image buffer
                 self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
 
-                # Center text vertically: "No wifi connection" in large font (16px)
-                self._draw_text(2, 8, "No wifi", font=self.temp_font)
-                self._draw_text(2, 24, "connection", font=self.base_font)
+                self._draw_text(0, 0, "No wifi", font=self.temp_font)
+                self._draw_text(0, 18, "connection", font=self.base_font)
 
                 # Push to display
                 self.display.image(self.image)
@@ -351,11 +350,8 @@ class DisplayControl:
                 # Clear image buffer
                 self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
 
-                # Top line: "Configuration" in large font (16px)
-                self._draw_text(2, 0, "Configuration", font=self.temp_font)
-
-                # Bottom line: "successful" in large font (16px)
-                self._draw_text(2, 18, "successful", font=self.temp_font)
+                self._draw_text(0, 0, "Configuration", font=self.temp_font)
+                self._draw_text(0, 18, "successful", font=self.base_font)
 
                 # Push to display
                 self.display.image(self.image)
