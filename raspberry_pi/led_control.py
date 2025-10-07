@@ -165,18 +165,21 @@ class LedControl:
                     if current_second != last_displayed_second:
                         last_displayed_second = current_second
                         
-                        if duration >= 30:
-                            # Show countdown for full reset (30+ seconds)
-                            countdown = current_second
-                            self.display_control.show_message(f"{countdown} Full Reset")
-                        elif duration >= 10:
-                            # Show countdown for setup mode (10-30 seconds)
-                            countdown = current_second
-                            self.display_control.show_message(f"{countdown} Setup mode")
-                        elif duration >= 2:
-                            # Show countdown for reboot (2-10 seconds)
-                            countdown = current_second
+                        if duration <= 2:
+                            # Show countdown to reboot threshold (0-2 seconds)
+                            countdown = 2 - current_second
                             self.display_control.show_message(f"{countdown} Reboot")
+                        elif duration <= 10:
+                            # Show countdown to setup mode threshold (2-10 seconds)
+                            countdown = 10 - current_second
+                            self.display_control.show_message(f"{countdown} Setup Mode")
+                        else:
+                            # Show countdown to full reset threshold (10-30 seconds) or count up after 30
+                            if duration <= 30:
+                                countdown = 30 - current_second
+                                self.display_control.show_message(f"{countdown} Full Reset")
+                            else:
+                                self.display_control.show_message('Release button', 'to reset settings')
                     
                     # Check for 2 second mark
                     if not two_second_mark_reached and duration > 2:
