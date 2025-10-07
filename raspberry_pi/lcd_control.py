@@ -53,6 +53,7 @@ class DisplayControl:
         self.temp_font = None
         self.small_font = None
         self.base_font = None
+        self.freezerbot_font = None
 
         # Synchronization for drawing and animation
         self._draw_lock = threading.Lock()
@@ -93,6 +94,7 @@ class DisplayControl:
             # Use default 8px font for serial and marquee
             self.base_font = ImageFont.load_default()
             self.small_font = self.base_font
+            self.freezerbot_font = ImageFont.truetype(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'assets/fonts/orbitron.ttf'), 20)
             
             # Create 16px font for temperature using truetype
             try:
@@ -262,6 +264,20 @@ class DisplayControl:
         except Exception as e:
             print(f"Error showing centered message: {traceback.format_exc()}")
 
+    def show_freezerbot_message(self):
+        if not self.display_available or self.display is None:
+            return
+        try:
+            self._stop_marquee()
+
+            with self._draw_lock:
+                self._clear_image_buffer()
+                self._draw_text(0, 0, 'Freezerbot', font=self.freezerbot_font)
+                self._display_image()
+
+        except Exception as e:
+            print(f"Error showing Freezerbot message: {traceback.format_exc()}")
+
     def show_entering_setup_message(self):
         """Display 'Entering setup' message when transitioning to setup mode"""
         self._show_centered_message("Entering setup")
@@ -369,6 +385,11 @@ class DisplayControl:
 
         except Exception:
             print(f"Error showing API error message: {traceback.format_exc()}")
+
+    def _clear_image_buffer(self):
+        if not self.display_available or self.display is None:
+            return
+        self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
 
     def _refresh_display(self):
         """Redraw the entire display with current state"""
