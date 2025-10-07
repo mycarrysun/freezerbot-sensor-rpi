@@ -87,7 +87,7 @@ class DisplayControl:
         try:
             i2c = busio.I2C(board.SCL, board.SDA)
             self.display = SSD1306_I2C(128, 32, i2c, addr=0x3c)
-            self.image = Image.new('1', (self.display.width, self.display.height))
+            self.image = Image.new('1', (self.display.width, self.display.height)).rotate(180)
             self.draw = ImageDraw.Draw(self.image)
 
             # Use default 8px font for serial and marquee
