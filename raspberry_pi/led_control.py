@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from api import clear_api_token
 from restarts import restart_in_setup_mode
 from config import Config
+from lcd_control import DisplayControl
 
 LED_CONTROL_DISABLED = 'LED_DISABLED'
 BUTTON_PIN = 17
@@ -45,6 +46,7 @@ class LedControl:
         self.led_disabled = False
         self.button_disabled = False
         self.config = Config()
+        self.display_control = DisplayControl()
 
         self.BUTTON_PIN = BUTTON_PIN
         self.LED_PIN = LED_PIN
@@ -124,6 +126,7 @@ class LedControl:
         two_second_mark_reached = False
         ten_second_mark_reached = False
         thirty_second_mark_reached = False
+        last_displayed_second = -1
 
         while self.running and not self.button_disabled:
             try:
@@ -150,25 +153,48 @@ class LedControl:
                     self.reboot_triggered = False
                     self.setup_mode_triggered = False
                     self.factory_reset_triggered = False
+                    last_displayed_second = -1
                     print(f"[Thread {thread_id}] Button pressed")
 
-                # Button still pressed - check for 2 second mark
-                elif current_state == GPIO.LOW and self.button_being_pressed and not two_second_mark_reached and current_time - press_start_time > 2:
-                    print(f"[Thread {thread_id}] 2 second press detected - preparing for reboot")
-                    two_second_mark_reached = True
-                    self.signal_reboot_preparation()
+                # Button still pressed - update countdown display and check thresholds
+                elif current_state == GPIO.LOW and self.button_being_pressed:
+                    duration = current_time - press_start_time
+                    current_second = int(duration)
+                    
+                    # Update display every second with countdown
+                    if current_second != last_displayed_second:
+                        last_displayed_second = current_second
+                        
+                        if duration >= 30:
+                            # Show countdown for full reset (30+ seconds)
+                            countdown = current_second
+                            self.display_control.show_message(f"{countdown} Full Reset")
+                        elif duration >= 10:
+                            # Show countdown for setup mode (10-30 seconds)
+                            countdown = current_second
+                            self.display_control.show_message(f"{countdown} Setup mode")
+                        elif duration >= 2:
+                            # Show countdown for reboot (2-10 seconds)
+                            countdown = current_second
+                            self.display_control.show_message(f"{countdown} Reboot")
+                    
+                    # Check for 2 second mark
+                    if not two_second_mark_reached and duration > 2:
+                        print(f"[Thread {thread_id}] 2 second press detected - preparing for reboot")
+                        two_second_mark_reached = True
+                        self.signal_reboot_preparation()
 
-                # Check for 10 second press while button is still pressed
-                elif current_state == GPIO.LOW and self.button_being_pressed and not ten_second_mark_reached and current_time - press_start_time > 10:
-                    print(f"[Thread {thread_id}] Long press detected (10 seconds) - preparing for reset mode")
-                    ten_second_mark_reached = True
-                    self.signal_reset_mode()
+                    # Check for 10 second press
+                    if not ten_second_mark_reached and duration > 10:
+                        print(f"[Thread {thread_id}] Long press detected (10 seconds) - preparing for reset mode")
+                        ten_second_mark_reached = True
+                        self.signal_reset_mode()
 
-                # Check for 30 second press while button is still pressed
-                elif current_state == GPIO.LOW and self.button_being_pressed and not thirty_second_mark_reached and current_time - press_start_time > 30:
-                    print(f"[Thread {thread_id}] Extra long press detected (30 seconds) - preparing for factory reset")
-                    thirty_second_mark_reached = True
-                    self.signal_factory_reset()
+                    # Check for 30 second press
+                    if not thirty_second_mark_reached and duration > 30:
+                        print(f"[Thread {thread_id}] Extra long press detected (30 seconds) - preparing for factory reset")
+                        thirty_second_mark_reached = True
+                        self.signal_factory_reset()
 
                 # Button released
                 elif current_state == GPIO.HIGH and self.button_being_pressed:
@@ -179,11 +205,13 @@ class LedControl:
                     if thirty_second_mark_reached and not self.factory_reset_triggered:
                         print(f"[Thread {thread_id}] Factory resetting system...")
                         self.factory_reset_triggered = True
+                        self.display_control.show_message("Resetting", "please wait...")
                         self.perform_factory_reset()
                     # If we have passed the 10 second mark but not the 30 second mark, reset to setup mode
                     elif ten_second_mark_reached and duration < 30 and not self.setup_mode_triggered:
                         print(f"[Thread {thread_id}] Resetting to setup mode...")
                         self.setup_mode_triggered = True
+                        self.display_control.show_message("Starting Setup")
                         # clear just the api token so we still have the current config to allow editing
                         # the user will just have to re-enter their email/password
                         clear_api_token()
@@ -193,14 +221,21 @@ class LedControl:
                     elif two_second_mark_reached and duration < 10 and not self.reboot_triggered:
                         print(f"[Thread {thread_id}] Rebooting system...")
                         self.reboot_triggered = True
+                        self.display_control.show_message("Rebooting")
                         self.reboot_system()
-                    elif not self.reboot_triggered and not self.setup_mode_triggered and not self.factory_reset_triggered and self.previous_state:
-                        # if the button was released without triggering anything we should set it back to the previous state
-                        self.set_state(self.previous_state)
+                    elif not self.reboot_triggered and not self.setup_mode_triggered and not self.factory_reset_triggered:
+                        # if the button was released without triggering anything we should reset the display
+                        try:
+                            self.display_control.clear_critical_message()
+                        except Exception:
+                            pass
+                        if self.previous_state:
+                            self.set_state(self.previous_state)
 
                     two_second_mark_reached = False
                     ten_second_mark_reached = False
                     thirty_second_mark_reached = False
+                    last_displayed_second = -1
 
                 # Small sleep to prevent CPU hogging
                 time.sleep(0.1)

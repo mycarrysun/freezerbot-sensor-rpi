@@ -318,6 +318,38 @@ class DisplayControl:
         self.showing_critical_message = True
         self._show_two_line_message("Bad probe", "Contact Support")
 
+    def show_message(self, top_line: str, bottom_line: str = ""):
+        """Display a custom message with top line in large font and optional bottom line in base font
+        
+        This is a public method that allows external modules to display custom text on the screen.
+        
+        Args:
+            top_line: Text for the top line (will use temp_font - 16px)
+            bottom_line: Optional text for the bottom line (will use base_font - 8px). Defaults to empty string.
+        """
+        if not self.display_available or self.display is None:
+            return
+
+        try:
+            self._stop_marquee()
+
+            with self._draw_lock:
+                # Clear image buffer
+                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
+
+                # Top line: large font (16px) at position (0, 0)
+                self._draw_text(0, 0, top_line, font=self.temp_font)
+
+                # Bottom line: base font (8px) at position (0, 18) if provided
+                if bottom_line:
+                    self._draw_text(0, 18, bottom_line, font=self.base_font)
+
+                # Push to display
+                self._display_image()
+
+        except Exception as e:
+            print(f"Error showing message: {traceback.format_exc()}")
+
     def clear_critical_message(self):
         """Clear the critical message flag to allow normal display updates to resume"""
         self.showing_critical_message = False
