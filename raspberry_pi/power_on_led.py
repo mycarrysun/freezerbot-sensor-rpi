@@ -1,5 +1,6 @@
 import RPi.GPIO as GPIO
 from led_control import LED_PIN
+from lcd_control import DisplayControl
 
 # Set up GPIO
 GPIO.setmode(GPIO.BCM)
@@ -11,3 +12,7 @@ GPIO.output(LED_PIN, GPIO.HIGH)
 # Don't cleanup so the LED stays on
 # The LED control will be taken over by the main application when it starts
 # which will reset the GPIO mode and settings
+
+dc = DisplayControl()
+dc.show_freezerbot_message()
+
