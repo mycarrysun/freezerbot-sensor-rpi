@@ -87,7 +87,7 @@ class DisplayControl:
         try:
             i2c = busio.I2C(board.SCL, board.SDA)
             self.display = SSD1306_I2C(128, 32, i2c, addr=0x3c)
-            self.image = Image.new('1', (self.display.width, self.display.height)).rotate(180)
+            self.image = Image.new('1', (self.display.width, self.display.height))
             self.draw = ImageDraw.Draw(self.image)
 
             # Use default 8px font for serial and marquee
@@ -137,6 +137,16 @@ class DisplayControl:
             self.display.show()
         except Exception:
             print(f"Error clearing display: {traceback.format_exc()}")
+
+    def _display_image(self):
+        """Push the current image buffer to the display with 180-degree rotation"""
+        if not self.display_available or self.display is None:
+            return
+        try:
+            self.display.image(self.image.rotate(180))
+            self.display.show()
+        except Exception:
+            print(f"Error displaying image: {traceback.format_exc()}")
 
     def update_temperature(self, celsius: float):
         """Update the temperature display (converts to Fahrenheit)"""
@@ -222,8 +232,7 @@ class DisplayControl:
                 self._draw_text(0, 18, bottom_line, font=self.base_font)
 
                 # Push to display
-                self.display.image(self.image)
-                self.display.show()
+                self._display_image()
 
         except Exception as e:
             print(f"Error showing two-line message: {traceback.format_exc()}")
@@ -248,8 +257,7 @@ class DisplayControl:
                 self._draw_text(0, 8, message, font=self.temp_font)
 
                 # Push to display
-                self.display.image(self.image)
-                self.display.show()
+                self._display_image()
 
         except Exception as e:
             print(f"Error showing centered message: {traceback.format_exc()}")
@@ -357,8 +365,7 @@ class DisplayControl:
                     x += text_w + gap
 
                 # Push to display
-                self.display.image(self.image)
-                self.display.show()
+                self._display_image()
 
         except Exception:
             print(f"Error showing API error message: {traceback.format_exc()}")
@@ -431,8 +438,7 @@ class DisplayControl:
                         x += text_w + gap
 
                 # Push to display
-                self.display.image(self.image)
-                self.display.show()
+                self._display_image()
 
         except Exception:
             print(f"Error refreshing display: {traceback.format_exc()}")
