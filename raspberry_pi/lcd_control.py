@@ -210,35 +210,6 @@ class DisplayControl:
             self._marquee_thread.join(timeout=0.5)
             self._marquee_thread = None
 
-    def _show_two_line_message(self, top_line: str, bottom_line: str):
-        """Display a two-line message with top line in large font and bottom line in base font
-        
-        Args:
-            top_line: Text for the top line (will use temp_font - 16px)
-            bottom_line: Text for the bottom line (will use base_font - 8px)
-        """
-        if not self.display_available or self.display is None:
-            return
-
-        try:
-            self._stop_marquee()
-
-            with self._draw_lock:
-                # Clear image buffer
-                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
-
-                # Top line: large font (16px) at position (0, 0)
-                self._draw_text(0, 0, top_line, font=self.temp_font)
-
-                # Bottom line: base font (8px) at position (0, 18)
-                self._draw_text(0, 18, bottom_line, font=self.base_font)
-
-                # Push to display
-                self._display_image()
-
-        except Exception as e:
-            print(f"Error showing two-line message: {traceback.format_exc()}")
-
     def _show_centered_message(self, message: str):
         """Display a single-line centered message in large font
         
@@ -280,43 +251,22 @@ class DisplayControl:
 
     def show_entering_setup_message(self):
         """Display 'Entering setup' message when transitioning to setup mode"""
-        self._show_centered_message("Entering setup")
+        self.show_message("Entering setup")
 
     def show_setup_mode(self):
         """Display setup mode screen with WiFi hotspot information"""
         # Get last 4 digits of serial number
         serial_suffix = self.serial[-4:] if len(self.serial) >= 4 else self.serial
         wifi_text = f"Freezerbot-Setup-{serial_suffix}"
-        self._show_two_line_message("Setup Mode Wifi", wifi_text)
+        self.show_message("Setup Mode Wifi", wifi_text)
 
-    def show_configuring_message(self):
-        """Display 'Configuring...' message during setup"""
-        self._show_centered_message("Configuring...")
+    def show_critical_message(self, top_line: str, bottom_line: str = ""):
+        """Displays a critical error or message that should be displayed no matter what"""
+        if not self.display_available or self.display is None:
+            return
 
-    def show_wifi_found_message(self, network_name: str):
-        """Display 'Wifi found' with network name
-        
-        Args:
-            network_name: The SSID of the connected network
-        """
-        self._show_two_line_message("Wifi found", network_name)
-
-    def show_no_wifi_message(self):
-        """Display 'No wifi connection' message"""
-        self._show_two_line_message("No wifi", "connection")
-
-    def show_configuration_successful_message(self):
-        """Display 'Configuration successful' message"""
-        self._show_two_line_message("Configuration", "successful")
-
-    def show_invalid_login_message(self):
-        """Display 'Invalid login / enter setup mode' message"""
-        self._show_two_line_message("Invalid login", "enter setup mode")
-
-    def show_bad_probe_message(self):
-        """Display 'Bad probe / Contact Support' message when temperature sensor errors are detected"""
         self.showing_critical_message = True
-        self._show_two_line_message("Bad probe", "Contact Support")
+        self.show_message(top_line, bottom_line)
 
     def show_message(self, top_line: str, bottom_line: str = ""):
         """Display a custom message with top line in large font and optional bottom line in base font
@@ -334,8 +284,7 @@ class DisplayControl:
             self._stop_marquee()
 
             with self._draw_lock:
-                # Clear image buffer
-                self.draw.rectangle((0, 0, 128, 32), outline=0, fill=0)
+                self._clear_image_buffer()
 
                 # Top line: large font (16px) at position (0, 0)
                 self._draw_text(0, 0, top_line, font=self.temp_font)
@@ -344,7 +293,6 @@ class DisplayControl:
                 if bottom_line:
                     self._draw_text(0, 18, bottom_line, font=self.base_font)
 
-                # Push to display
                 self._display_image()
 
         except Exception as e:

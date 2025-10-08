@@ -123,10 +123,7 @@ class FreezerBotSetup:
             }
 
             # Show "Configuring..." message immediately
-            try:
-                self.display_control.show_configuring_message()
-            except Exception:
-                pass
+            self.display_control.show_message("Configuring...")
 
             self.config.save_new_config(config)
 
@@ -155,6 +152,10 @@ class FreezerBotSetup:
             from api import make_api_request_with_creds
             from device_info import DeviceInfo
             from datetime import datetime
+
+            # Show "looking for wifi..." message immediately
+            print("Looking for WiFi connection...")
+            self.display_control.show_message("No connection", "looking for wifi...")
             
             # Wait for network manager to set up connections
             # Frontend shows countdown for 10 seconds
@@ -199,23 +200,12 @@ class FreezerBotSetup:
             
             if not wifi_connected:
                 # Show "No wifi connection" message
-                try:
-                    self.display_control.show_no_wifi_message()
-                except Exception:
-                    pass
+                self.display_control.show_message("No wifi found", "Setup: Hold 10s")
                 print("WiFi connection failed during setup")
                 self.led_control.set_state('error')
                 time.sleep(1)
             else:
-                # WiFi connected - show success message
-                try:
-                    if connected_network_name:
-                        self.display_control.show_wifi_found_message(connected_network_name)
-                    else:
-                        self.display_control.show_wifi_found_message("Connected")
-                except Exception:
-                    pass
-                
+                self.display_control.show_message("Wifi Found", connected_network_name)
                 # Wait a moment to show the wifi success message
                 time.sleep(1)
                 
@@ -236,10 +226,7 @@ class FreezerBotSetup:
                     
                     if response.status_code == 401:
                         print('Invalid Freezerbot login credentials')
-                        try:
-                            self.display_control.show_invalid_login_message()
-                        except Exception:
-                            pass
+                        self.display_control.show_message("Invalid login", "enter setup mode")
                         self.led_control.set_state('error')
                         # Wait to show the message, then restart in sensor mode
                         time.sleep(1)
@@ -256,11 +243,8 @@ class FreezerBotSetup:
                     else:
                         # Success!
                         print('Configuration successful')
-                        try:
-                            self.display_control.show_configuration_successful_message()
-                        except Exception:
-                            pass
-                        
+                        self.display_control.show_message("Configuration", "successful")
+
                         # Wait a moment to show success message
                         time.sleep(1)
                         
