@@ -162,6 +162,24 @@ class TemperatureMonitor:
 
         print(f"Starting with network_failure_count: {self.network_failure_count}, reboot_count: {self.reboot_count}")
 
+        print("Checking for WiFi connection on startup...")
+        self.display_control.show_message("No connection", "looking for wifi...")
+        
+        max_wifi_wait_on_startup = 180  # 3 minutes
+        wifi_connected_on_startup = False
+        
+        for i in range(max_wifi_wait_on_startup):
+            if connected_to_wifi():
+                wifi_connected_on_startup = True
+                print(f"WiFi connected after {i} seconds")
+                break
+            time.sleep(1)
+        
+        if not wifi_connected_on_startup:
+            print("WiFi not found after 3 minutes on startup")
+            self.display_control.show_message("No wifi found", "Setup: Hold 10s")
+            time.sleep(3)
+        
         # Main monitoring loop - continue indefinitely
         while True:
             try:
