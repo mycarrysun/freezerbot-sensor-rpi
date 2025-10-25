@@ -10,6 +10,3 @@ WorkingDirectory=/home/pi
 User=root
 Environment=PATH=/home/pi/freezerbot/.venv/bin:$PATH
 RemainAfterExit=no
-
-[Install]
-WantedBy=multi-user.target
