@@ -87,7 +87,8 @@ class DisplayControl:
         """Initialize the physical display hardware"""
         try:
             i2c = busio.I2C(board.SCL, board.SDA)
-            self.display = SSD1306_I2C(128, 32, i2c, addr=0x3c)
+            display_address = self._find_display_address_on_i2c_bus(i2c)
+            self.display = SSD1306_I2C(128, 32, i2c, addr=display_address)
             self.image = Image.new('1', (self.display.width, self.display.height))
             self.draw = ImageDraw.Draw(self.image)
 
@@ -118,6 +119,19 @@ class DisplayControl:
         except Exception:
             print(f"Failed to initialize display: {traceback.format_exc()}")
             self.display_available = False
+
+    def _find_display_address_on_i2c_bus(self, i2c, possible_addresses=[0x3c, 0x3d, 0x32]):
+        while not i2c.try_lock():
+            pass
+
+        try:
+            detected_addresses = i2c.scan()
+            for address in possible_addresses:
+                if address in detected_addresses:
+                    return address
+            raise RuntimeError(f"No display found. Detected devices at: {[hex(addr) for addr in detected_addresses]}")
+        finally:
+            i2c.unlock()
 
     def _get_serial_number(self) -> str:
         """Read device serial number from /proc/cpuinfo"""
