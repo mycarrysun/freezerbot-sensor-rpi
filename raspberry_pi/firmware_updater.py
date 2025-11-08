@@ -5,6 +5,7 @@ import subprocess
 import traceback
 import json
 from datetime import datetime
+from dotenv import load_dotenv
 from time import sleep
 from config import Config
 from api import api_token_exists
@@ -12,6 +13,7 @@ from api import make_api_request
 from device_info import DeviceInfo
 from temperature_monitor import TemperatureMonitor
 
+FIRMWARE_UPDATER_ENABLED = 'FIRMWARE_UPDATER_ENABLED'
 
 class FirmwareUpdater:
     """
@@ -24,6 +26,9 @@ class FirmwareUpdater:
     """
 
     def __init__(self):
+        load_dotenv(override=True)
+        self.enabled = os.getenv(FIRMWARE_UPDATER_ENABLED, 'true').lower() == 'true'
+
         self.initialize_paths()
         self.setup_logging()
         self.config = Config()
@@ -387,6 +392,10 @@ class FirmwareUpdater:
 
     def run(self):
         """Main entry point for the updater service with tiered recovery"""
+        if not self.enabled:
+            self.logger.info("Updater service is disabled. Exiting.")
+            return
+
         self.logger.info("Starting firmware update check")
 
         if not self.updates_are_available():
