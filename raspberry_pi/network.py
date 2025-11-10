@@ -165,21 +165,21 @@ def get_ip_address() -> str:
             ["/usr/bin/nmcli", "-t", "-f", "IP4.ADDRESS", "device", "show", "wlan0"],
             capture_output=True, text=True, timeout=2
         )
-        
+
         if result.returncode == 0 and result.stdout.strip():
             ip_line = result.stdout.strip().split('\n')[0]
             if ip_line:
-                # Format is usually "192.168.1.1/24" - extract just the IP
-                ip = ip_line.split('/')[0].strip()
+                # Format is usually "IP4.ADDRESS[1]:192.168.1.1/24" - extract just the IP
+                ip = ip_line.split(':')[1].split('/')[0].strip()
                 if ip:
                     return ip
-        
+
         # Fallback: use ip addr command
         result = subprocess.run(
             ["/bin/ip", "addr", "show", "wlan0"],
             capture_output=True, text=True, timeout=2
         )
-        
+
         if result.returncode == 0 and result.stdout.strip():
             for line in result.stdout.strip().split('\n'):
                 if 'inet ' in line and not 'inet6' in line:
@@ -188,7 +188,7 @@ def get_ip_address() -> str:
                     if len(parts) >= 2:
                         ip = parts[1].split('/')[0]
                         return ip
-        
+
         return None
     except Exception as e:
         return None
@@ -205,9 +205,9 @@ def get_mac_address() -> str:
             ["/usr/bin/nmcli", "-t", "-f", "GENERAL.HWADDR", "device", "show", "wlan0"],
             capture_output=True, text=True, timeout=2
         )
-        
+
         if result.returncode == 0 and result.stdout.strip():
-            mac = result.stdout.strip()
+            mac = result.stdout.strip().split(':')[1]
             if mac:
                 return mac
         
