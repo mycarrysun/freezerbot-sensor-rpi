@@ -252,11 +252,16 @@ class FirmwareUpdater:
                 log_prefix="Install"
             )
 
-            self.logger.info('Running install-system-deps script')
-            self.run_command_with_logging(
-                ["/usr/bin/sudo", f"{self.base_directory}/install-system-deps.sh"],
-                log_prefix="Install system deps"
-            )
+            # Run install-system-deps script if it exists (for backwards compatibility)
+            system_deps_script = f"{self.base_directory}/install-system-deps.sh"
+            if os.path.exists(system_deps_script):
+                self.logger.info('Running install-system-deps script')
+                self.run_command_with_logging(
+                    ["/usr/bin/sudo", system_deps_script],
+                    log_prefix="Install system deps"
+                )
+            else:
+                self.logger.info('install-system-deps.sh not found, skipping (backwards compatibility)')
 
             self.run_command_with_logging(
                 ["/usr/bin/sudo", f"{self.base_directory}/.venv/bin/pip", "install", "-r", f"{self.base_directory}/requirements.txt"],
