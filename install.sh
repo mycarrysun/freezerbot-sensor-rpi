@@ -9,6 +9,16 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+add_line_if_missing() {
+    local file_path="$1"
+    local line_to_add="$2"
+
+    if ! grep -qF "$line_to_add" "$file_path" 2>/dev/null; then
+        echo "$line_to_add" >> "$file_path"
+        echo "Added to $file_path: $line_to_add"
+    fi
+}
+
 echo "Beginning Freezerbot installation..."
 
 # Create directory structure
@@ -69,6 +79,21 @@ chmod 644 /etc/systemd/system/freezerbot-monitor.service
 chmod 644 /etc/systemd/system/freezerbot-updater.service
 chmod 644 /etc/systemd/system/freezerbot-updater.timer
 chmod 644 /etc/systemd/system/freezerbot-power-led.service
+
+# Disable power hungry services
+systemctl disable bluetooth
+systemctl disable hciuart
+systemctl disable avahi-daemon
+
+# Disable HDMI (saves ~25mA)
+add_line_if_missing "/etc/rc.local" "/usr/bin/tvservice -o"
+
+# Put cpu in power saving mode, lives in rc.local cause it doesn't persist across reboots
+add_line_if_missing "/etc/rc.local" "echo powersave > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+
+# Disable LEDs
+add_line_if_missing "/boot/config.txt" "dtparam=act_led_trigger=none"
+add_line_if_missing "/boot/config.txt" "dtparam=act_led_activelow=off"
 
 # Enable services
 systemctl daemon-reload
