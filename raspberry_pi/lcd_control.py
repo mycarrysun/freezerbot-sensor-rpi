@@ -359,20 +359,9 @@ class DisplayControl:
                 # Top line: "API Error" in large font (16px)
                 self._draw_text(0, 0, "API Error", font=self.temp_font)
 
-                # Bottom line: Start the marquee with status code and response text
-                # The marquee will be drawn by the _marquee_loop thread
-                msg = error_message
-                try:
-                    text_w = int(self.draw.textlength(msg, font=self.base_font))
-                except Exception:
-                    text_w = self.base_font.getsize(msg)[0] if hasattr(self.base_font, 'getsize') else len(msg) * 6
-                gap = 8
-                y = 16
-                x = self.marquee_offset
-                # Draw initial copies for seamless looping
-                while x < 128:
-                    self._draw_text(x, y, msg)
-                    x += text_w + gap
+                # Bottom line: Draw the marquee with status code and response text
+                # The marquee will be updated by the _marquee_loop thread
+                self._draw_marquee(error_message)
 
                 # Push to display
                 self._display_image()
@@ -438,19 +427,7 @@ class DisplayControl:
                 # Prioritize custom marquee_text over default_marquee
                 active_marquee = self.marquee_text if self.marquee_text else self.default_marquee
                 if active_marquee:
-                    msg = active_marquee
-                    # Measure text width
-                    try:
-                        text_w = int(self.draw.textlength(msg, font=self.base_font))
-                    except Exception:
-                        text_w = self.base_font.getsize(msg)[0] if hasattr(self.base_font, 'getsize') else len(msg) * 6
-                    gap = 8  # pixels between repeats
-                    y = 16  # bottom half of the 32px display
-                    x = self.marquee_offset
-                    # Draw copies for seamless looping
-                    while x < 128:
-                        self._draw_text(x, y, msg)
-                        x += text_w + gap
+                    self._draw_marquee(active_marquee)
 
                 # Push to display
                 self._display_image()
@@ -466,6 +443,32 @@ class DisplayControl:
             self.draw.text((x, y), text, fill=255, font=font)
         except Exception:
             self.draw.text((x, y), text, fill=255)
+
+    def _draw_marquee(self, text: str, y: int = 16, font=None):
+        """Draw marquee text, handling both static display (if text fits) and scrolling (if too wide).
+        
+        Args:
+            text: Text to display in the marquee
+            y: Y position for the marquee (defaults to 16 for bottom half of display)
+            font: Font to use (defaults to base_font)
+        """
+        if not text:
+            return
+        
+        # Measure text width
+        text_w = self._get_marquee_text_width(text, font)
+        
+        # Only scroll if text is wider than display width (128 pixels)
+        if text_w > 128:
+            gap = 8  # pixels between repeats
+            x = self.marquee_offset
+            # Draw copies for seamless looping
+            while x < 128:
+                self._draw_text(x, y, text, font=font)
+                x += text_w + gap
+        else:
+            # Text fits, display it statically at x=0
+            self._draw_text(0, y, text, font=font)
 
     def _draw_battery_icon(self, x: int, y: int, percent: float, charging: bool, plugged_in: bool):
         """Draw battery icon with charge level (no percent text or + sign)."""
@@ -587,6 +590,23 @@ class DisplayControl:
             self.marquee_offset = 0
             self._refresh_display()
 
+    def _get_marquee_text_width(self, text: str, font=None) -> int:
+        """Get the width of marquee text in pixels.
+        
+        Args:
+            text: Text to measure
+            font: Font to use (defaults to base_font)
+            
+        Returns:
+            Text width in pixels
+        """
+        if font is None:
+            font = self.base_font or self.small_font
+        try:
+            return int(self.draw.textlength(text, font=font))
+        except Exception:
+            return font.getsize(text)[0] if hasattr(font, 'getsize') else len(text) * 6
+
     def _marquee_loop(self):
         """Background loop to scroll the marquee while enabled."""
         try:
@@ -598,20 +618,22 @@ class DisplayControl:
                     # Nothing to show; pause and continue
                     time.sleep(0.2)
                     continue
-                # Measure text width
-                try:
-                    text_w = int(self.draw.textlength(active_marquee, font=self.base_font or self.small_font))
-                except Exception:
-                    fnt = self.base_font or self.small_font
-                    text_w = fnt.getsize(active_marquee)[0] if hasattr(fnt, 'getsize') else len(active_marquee) * 6
-                gap = 8  # pixels between repeats
-
-                # Update position
-                self.marquee_offset -= self.marquee_speed_px
-                if self.marquee_offset < -(text_w + gap):
+                
+                # Measure text width to determine if scrolling is needed
+                text_w = self._get_marquee_text_width(active_marquee)
+                
+                # Only scroll if text is wider than display width (128 pixels)
+                if text_w > 128:
+                    gap = 8  # pixels between repeats
+                    # Update position for scrolling
+                    self.marquee_offset -= self.marquee_speed_px
+                    if self.marquee_offset < -(text_w + gap):
+                        self.marquee_offset = 0
+                else:
+                    # Text fits, keep it static at offset 0
                     self.marquee_offset = 0
 
-                # Refresh display
+                # Refresh display (which will call _draw_marquee)
                 self._refresh_display()
                 time.sleep(0.1)
         except Exception:
