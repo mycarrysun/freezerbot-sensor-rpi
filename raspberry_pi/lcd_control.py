@@ -181,7 +181,7 @@ class DisplayControl:
         
         Args:
             connected: Whether WiFi is connected
-            signal_strength: Signal strength as percentage (0-100)
+            signal_strength: Signal strength as dBm
         """
         self.wifi_connected = connected
         self.wifi_strength = signal_strength
@@ -480,14 +480,14 @@ class DisplayControl:
             if fill_width > 0:
                 self.draw.rectangle((x + 1, y + 1, x + 1 + fill_width, y + 6), outline=255, fill=255)
 
-    def _draw_wifi_icon(self, x: int, y: int, connected: bool, signal_strength: int = 0):
+    def _draw_wifi_icon(self, x: int, y: int, connected: bool, signal_strength: int = -100):
         """Draw Wi‑Fi status as ascending RSSI bars based on signal strength.
         
         Args:
             x: X position
             y: Y position
             connected: Whether WiFi is connected
-            signal_strength: Signal strength 0-100 (determines number of bars)
+            signal_strength: Signal strength as dBm
         """
         # Icon size ~12x10 (fits next to battery)
         base_y = y + 9  # bottom baseline
@@ -505,7 +505,7 @@ class DisplayControl:
             self.draw.line((x + 11, y, x, y + 9), fill=255)
         else:
             # Determine number of bars to fill based on signal strength
-            # 0-25% = 1 bar, 26-50% = 2 bars, 51-75% = 3 bars, 76-100% = 4 bars
+            # 4 bars >= -55dBm, 3 bars >= -65dBm, 2 bars >= -75dBm, 1 bar >= -85dBm
             if signal_strength >= -55:
                 filled_bars = 4
             elif signal_strength >= -65:
