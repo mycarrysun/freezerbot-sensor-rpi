@@ -176,7 +176,7 @@ class DisplayControl:
         self.is_plugged_in = plugged_in
         self._refresh_display()
 
-    def update_wifi(self, connected: bool, signal_strength: int = 0):
+    def update_wifi(self, connected: bool, signal_strength: int = -100):
         """Update WiFi connection status and signal strength display
         
         Args:
@@ -506,14 +506,14 @@ class DisplayControl:
         else:
             # Determine number of bars to fill based on signal strength
             # 0-25% = 1 bar, 26-50% = 2 bars, 51-75% = 3 bars, 76-100% = 4 bars
-            if signal_strength <= 25:
-                filled_bars = 1
-            elif signal_strength <= 50:
-                filled_bars = 2
-            elif signal_strength <= 75:
-                filled_bars = 3
-            else:
+            if signal_strength >= -55:
                 filled_bars = 4
+            elif signal_strength >= -65:
+                filled_bars = 3
+            elif signal_strength >= -75:
+                filled_bars = 2
+            else:
+                filled_bars = 1
             
             # Draw bars
             for i, h in enumerate(heights):
