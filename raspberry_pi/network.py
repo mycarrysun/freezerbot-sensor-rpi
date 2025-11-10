@@ -16,8 +16,8 @@ def connected_to_wifi() -> bool:
 
 def get_wifi_signal_strength() -> int:
     """
-    Get WiFi signal strength as a percentage (0-100).
-    Returns 0 if not connected or unable to read signal strength.
+    Get WiFi signal strength as dBm.
+    Returns -100 if not connected or unable to read signal strength.
     """
     try:
         # First check if connected
@@ -31,20 +31,18 @@ def get_wifi_signal_strength() -> int:
         )
 
         if result.returncode == 0 and result.stdout.strip():
-            # Get the first line (current connection)
             lines = result.stdout.strip().split('\n')
             if lines:
-                # Parse signal strength (should be a number 0-100)
                 try:
                     signal = int(lines[0].strip())
-                    return max(0, min(100, signal)) * -1  # Clamp to 0-100
+                    return signal * -1
                 except ValueError:
                     pass
 
         # Fallback: if connected but can't get signal, return a default value
-        return -50
+        return -75
     except Exception as e:
-        # If anything goes wrong, return 0
+        # If anything goes wrong, return -100
         return -100
 
 
