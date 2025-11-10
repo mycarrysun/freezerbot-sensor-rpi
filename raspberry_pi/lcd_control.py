@@ -72,7 +72,7 @@ class DisplayControl:
         self.is_charging = False
         self.is_plugged_in = False
         self.wifi_connected = False
-        self.wifi_strength = 0  # WiFi signal strength 0-100
+        self.wifi_strength = -100
         self.api_status = False  # True if successfully sending to API
         self.error_status = False  # True if there are errors/issues
         self.showing_critical_message = False  # True when showing persistent critical message
@@ -521,9 +521,6 @@ class DisplayControl:
                 if i < filled_bars:
                     # Filled bar
                     self.draw.rectangle((left, base_y - h, left + bar_w - 1, base_y), fill=255)
-                else:
-                    # Outline bar (unfilled)
-                    self.draw.rectangle((left, base_y - h, left + bar_w - 1, base_y), outline=255, fill=0)
 
     def _draw_api_icon(self, x: int, y: int, sending: bool):
         """Draw API status icon as an upward arrow (upload symbol).
