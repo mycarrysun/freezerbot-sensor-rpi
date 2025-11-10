@@ -1,13 +1,10 @@
-import os
 import time
-import json
 import traceback
-from pydoc import classname
 
 import RPi.GPIO as GPIO
 import subprocess
 from led_control import LedControl
-from w1thermsensor import W1ThermSensor, NoSensorFoundError, SensorNotReadyError
+from w1thermsensor import W1ThermSensor
 from datetime import datetime
 from gpiozero import CPUTemperature
 
@@ -15,7 +12,8 @@ from api import make_api_request, api_token_exists, set_api_token, make_api_requ
 from freezerbot_setup import FreezerBotSetup
 from config import Config
 from battery import PiSugarMonitor
-from network import test_internet_connectivity, load_network_status, save_network_status, reset_network_status
+from network import test_internet_connectivity, load_network_status, save_network_status, reset_network_status, \
+    get_current_wifi_ssid, get_wifi_signal_strength, get_ip_address, get_mac_address, get_configured_wifi_networks
 from device_info import DeviceInfo
 from restarts import restart_in_setup_mode
 
@@ -195,7 +193,12 @@ class TemperatureMonitor:
                         'battery_volts': self.pisugar.get_voltage(),
                         'is_charging': self.pisugar.is_charging(),
                         'is_plugged_in': self.pisugar.is_power_plugged(),
-                        'is_allowed_to_charge': self.pisugar.is_charging_allowed()
+                        'is_allowed_to_charge': self.pisugar.is_charging_allowed(),
+                        'wifi_ssid': get_current_wifi_ssid(),
+                        'wifi_signal_strength': get_wifi_signal_strength(),
+                        'ip_address': get_ip_address(),
+                        'mac_address': get_mac_address(),
+                        'configured_wifi_networks': get_configured_wifi_networks(),
                     }
 
                     response = make_api_request('sensors/readings', json=payload)
