@@ -81,16 +81,29 @@ chmod 644 /etc/systemd/system/freezerbot-updater.timer
 chmod 644 /etc/systemd/system/freezerbot-power-led.service
 
 # Disable power hungry services
-systemctl disable bluetooth
-systemctl disable hciuart
-systemctl disable avahi-daemon
+systemctl disable bluetooth.service 2>/dev/null
+systemctl disable hciuart.service 2>/dev/null
+systemctl disable avahi-daemon.service 2>/dev/null
+systemctl disable triggerhappy.service 2>/dev/null
+systemctl disable dphys-swapfile.service 2>/dev/null
 
 # Disable HDMI (saves ~25mA)
 add_line_if_missing "/boot/firmware/config.txt" "hdmi_blanking=2"
 
+# Disable audio (saves ~5-10mA)
+add_line_if_missing "/boot/firmware/config.txt" "dtparam=audio=off"
+
+# Disable bluetooth (saves 30-40mA)
+add_line_if_missing "/boot/firmware/config.txt" "dtoverlay=disable-bt"
+
 # Disable LEDs
 add_line_if_missing "/boot/firmware/config.txt" "dtparam=act_led_trigger=none"
 add_line_if_missing "/boot/firmware/config.txt" "dtparam=act_led_activelow=off"
+add_line_if_missing "/boot/firmware/config.txt" "dtparam=pwr_led_trigger=none"
+add_line_if_missing "/boot/firmware/config.txt" "dtparam=pwr_led_activelow=off"
+
+# Reduce GPU memory (saves a bit of power, frees RAM)
+add_line_if_missing "/boot/firmware/config.txt" "gpu_mem=16"
 
 # Remove exit 0 from rc.local first so we can put it at the end
 sed -i '/^exit 0$/d' /etc/rc.local
