@@ -22,7 +22,7 @@ def get_wifi_signal_strength() -> int:
     try:
         # First check if connected
         if not connected_to_wifi():
-            return 0
+            return -100
         
         # Get signal strength using nmcli
         result = subprocess.run(
@@ -37,15 +37,15 @@ def get_wifi_signal_strength() -> int:
                 # Parse signal strength (should be a number 0-100)
                 try:
                     signal = int(lines[0].strip())
-                    return max(0, min(100, signal))  # Clamp to 0-100
+                    return max(0, min(100, signal)) * -1  # Clamp to 0-100
                 except ValueError:
                     pass
         
         # Fallback: if connected but can't get signal, return a default value
-        return 50
+        return -50
     except Exception as e:
         # If anything goes wrong, return 0
-        return 0
+        return -100
 
 
 def test_internet_connectivity() -> bool:
