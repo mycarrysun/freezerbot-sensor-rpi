@@ -91,6 +91,10 @@ add_line_if_missing "/etc/rc.local" "/usr/bin/tvservice -o"
 # Put cpu in power saving mode, lives in rc.local cause it doesn't persist across reboots
 add_line_if_missing "/etc/rc.local" "echo powersave > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
 
+# Put WiFi radio in low power state
+add_line_if_missing "/etc/rc.local" "iwconfig wlan0 txpower 10dBm"
+add_line_if_missing "/etc/rc.local" "iw wlan0 set power_save on"
+
 # Disable LEDs
 add_line_if_missing "/boot/config.txt" "dtparam=act_led_trigger=none"
 add_line_if_missing "/boot/config.txt" "dtparam=act_led_activelow=off"
