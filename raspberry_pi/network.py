@@ -207,7 +207,7 @@ def get_mac_address() -> str:
         )
 
         if result.returncode == 0 and result.stdout.strip():
-            mac = result.stdout.strip().split(':')[1]
+            mac = result.stdout.strip().split('GENERAL.HWADDR:')[0]
             if mac:
                 return mac
         
